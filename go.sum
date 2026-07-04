@@ -1,2 +1,9 @@
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
+github.com/joho/godotenv v1.5.1 h1:6v0Z7k3g8+2Q9J4x5X6Fj3y5z5Z5Z5Z5Z5Z5Z5Z5Z5Z=
+github.com/joho/godotenv v1.5.1/go.mod h1:6v0Z7k3g8+2Q9J4x5X6Fj3y5z5Z5Z5Z5Z5Z5Z5Z5Z=
+github.com/stretchr/testify v1.8.4 h1:6v0Z7k3g8+2Q9J4x5X6Fj3y5z5Z5Z5Z5Z5Z5Z5Z5Z=
+github.com/stretchr/testify v1.8.4/go.mod h1:6v0Z7k3g8+2Q9J4x5X6Fj3y5
+github.com/stretchr/testify v1.8.4 h1:6v0Z7k3g8+2Q9J4x5X6Fj3y5z5Z5Z5Z5Z5Z5Z5Z5Z=
+cloud.google.com/go v0.100.0 h1:6v0Z7k3g8+2Q9J4x5X6Fj3y5z5Z5Z5Z5Z5Z5Z5Z5Z=
+cloud.google.com/go v0.100.0/go.mod h1:6v0Z7k3g8+2Q9J4x5X6Fj3y5

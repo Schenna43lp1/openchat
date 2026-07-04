@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="de">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Open chat</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
   <main class="app-shell">
     <section class="chat-panel" aria-label="Chat">
@@ -22,7 +24,8 @@
       <div class="messages" id="messages" aria-live="polite"></div>
 
       <form class="composer" id="messageForm">
-        <textarea id="messageInput" rows="1" maxlength="4096" placeholder="Nachricht schreiben..." autocomplete="off"></textarea>
+        <textarea id="messageInput" rows="1" maxlength="4096" placeholder="Nachricht schreiben..."
+          autocomplete="off"></textarea>
         <button type="submit">Senden</button>
       </form>
     </section>
@@ -47,5 +50,9 @@
   </main>
 
   <script src="/static/app.js"></script>
+  <footer>
+    Developed by <a href="markusstuefer.com" target="_blank" rel="noopener noreferrer">Markus Stuefer</a>
+  </footer>
 </body>
+
 </html>
