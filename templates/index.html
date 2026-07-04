@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Go Chat</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="chat-panel" aria-label="Chat">
+      <header class="chat-header">
+        <div>
+          <p class="eyebrow">Realtime WebSocket Chat</p>
+          <h1>Go Chat</h1>
+        </div>
+        <div class="connection" id="connectionStatus" data-state="offline">
+          <span class="status-dot"></span>
+          <span id="connectionText">Offline</span>
+        </div>
+      </header>
+
+      <div class="messages" id="messages" aria-live="polite"></div>
+
+      <form class="composer" id="messageForm">
+        <textarea id="messageInput" rows="1" maxlength="4096" placeholder="Nachricht schreiben..." autocomplete="off"></textarea>
+        <button type="submit">Senden</button>
+      </form>
+    </section>
+
+    <aside class="sidebar" aria-label="Benutzer">
+      <div class="join-card" id="joinCard">
+        <h2>Benutzername</h2>
+        <form id="joinForm">
+          <input id="usernameInput" type="text" maxlength="32" placeholder="Dein Name" autocomplete="nickname" required>
+          <button type="submit">Verbinden</button>
+        </form>
+      </div>
+
+      <div class="users-panel">
+        <div class="users-heading">
+          <h2>Online</h2>
+          <span id="userCount">0</span>
+        </div>
+        <ul id="users"></ul>
+      </div>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
