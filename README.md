@@ -20,6 +20,8 @@ http://localhost:8080
 ```bash
 
 docker run -d --name openchat -p 8080:8080 ghcr.io/schenna43lp1/openchat:latest
+# Dev-Image:
+docker run -d --name openchat-dev -p 8080:8080 ghcr.io/schenna43lp1/openchat:dev
 ```
 
 ## Endpunkte

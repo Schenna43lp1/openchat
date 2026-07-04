@@ -3,10 +3,12 @@ name: Docker Image
 on:
   push:
     branches:
+      - dev
       - main
       - release/*
   pull_request:
     branches:
+      - dev
       - main
       - release/*
   workflow_dispatch:
@@ -43,6 +45,7 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
             type=sha,prefix=sha-
 
       - name: Build and push
@@ -53,4 +56,3 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           load: true
-
