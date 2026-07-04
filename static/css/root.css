@@ -1,4 +1,5 @@
 :root {
+    /* Shared design tokens used by static/style.css. */
     color-scheme: dark;
     --bg: #101114;
     --panel: #181a20;

@@ -49,6 +49,7 @@ type Hub struct {
 	closeOnce sync.Once
 }
 
+// NewHub creates the central chat event broker.
 func NewHub(logger *log.Logger) *Hub {
 	return &Hub{
 		register:   make(chan *Client),
@@ -60,6 +61,7 @@ func NewHub(logger *log.Logger) *Hub {
 	}
 }
 
+// Run processes register/unregister/broadcast events in a single goroutine.
 func (h *Hub) Run() {
 	for {
 		select {
@@ -81,6 +83,7 @@ func (h *Hub) Run() {
 			}
 
 		case message := <-h.broadcast:
+			// Chat messages are persisted in in-memory history and fanned out to all clients.
 			h.addToHistory(message)
 			h.sendAll(ChatEvent{
 				Type:      message.Type,
@@ -102,16 +105,19 @@ func (h *Hub) Run() {
 	}
 }
 
+// Close signals the hub loop to stop exactly once.
 func (h *Hub) Close() {
 	h.closeOnce.Do(func() {
 		close(h.done)
 	})
 }
 
+// BroadcastMessage submits a user message to the hub event loop.
 func (h *Hub) BroadcastMessage(username, text string) {
 	h.broadcast <- newMessage(EventMessage, username, text)
 }
 
+// broadcastSystem emits system messages (join/leave) to all clients.
 func (h *Hub) broadcastSystem(text string) {
 	message := newMessage(EventSystem, "", text)
 	h.addToHistory(message)
@@ -123,6 +129,7 @@ func (h *Hub) broadcastSystem(text string) {
 	})
 }
 
+// broadcastUsers sends the current online user list.
 func (h *Hub) broadcastUsers() {
 	users := make([]string, 0, len(h.clients))
 	for client := range h.clients {
@@ -132,6 +139,7 @@ func (h *Hub) broadcastUsers() {
 	h.sendAll(ChatEvent{Type: EventUsers, Users: users})
 }
 
+// sendAll performs non-blocking delivery and drops slow clients defensively.
 func (h *Hub) sendAll(event ChatEvent) {
 	for client := range h.clients {
 		select {
@@ -145,6 +153,7 @@ func (h *Hub) sendAll(event ChatEvent) {
 	}
 }
 
+// addToHistory keeps only the newest messages up to configured limit.
 func (h *Hub) addToHistory(message Message) {
 	h.history = append(h.history, message)
 	if len(h.history) > messageHistoryLimit {

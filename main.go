@@ -34,6 +34,7 @@ func main() {
 		logger.Fatalf("parse admin template: %v", err)
 	}
 
+	// User storage backend/path is resolved from env and can point to JSON or SQLite.
 	users, err := NewUserStore(resolveUsersStorePath())
 	if err != nil {
 		logger.Fatalf("load users: %v", err)
@@ -45,6 +46,7 @@ func main() {
 	}()
 	sessions := NewSessionManager()
 
+	// Hub owns websocket clients and message fan-out.
 	hub := NewHub(logger)
 	go hub.Run()
 
@@ -78,6 +80,7 @@ type indexViewData struct {
 	CanManageUsers bool
 }
 
+// indexHandler renders the chat UI for authenticated users.
 func indexHandler(tmpl *template.Template, logger *log.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -111,6 +114,7 @@ func loggingMiddleware(logger *log.Logger, next http.Handler) http.Handler {
 	})
 }
 
+// waitForShutdown performs graceful shutdown for HTTP server and websocket hub.
 func waitForShutdown(logger *log.Logger, server *http.Server, hub *Hub) {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
@@ -133,6 +137,7 @@ func waitForShutdown(logger *log.Logger, server *http.Server, hub *Hub) {
 	logger.Println("server stopped")
 }
 
+// resolveUsersStorePath allows overriding the default user storage file by env var.
 func resolveUsersStorePath() string {
 	if path := os.Getenv("OPENCHAT_USERS_FILE"); path != "" {
 		return path

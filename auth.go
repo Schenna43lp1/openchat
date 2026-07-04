@@ -66,6 +66,7 @@ type currentUser struct {
 	Role     UserRole
 }
 
+// staffRequired grants access to admins and moderators.
 func staffRequired(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, ok := r.Context().Value(currentUserContextKey).(currentUser)
@@ -86,6 +87,7 @@ type UserStore struct {
 	users  map[string]authUser
 }
 
+// userStoreFormat defines the persistence backend for users.
 type userStoreFormat string
 
 const (
@@ -97,6 +99,7 @@ func isStaffRole(role UserRole) bool {
 	return role == RoleAdmin || role == RoleModerator
 }
 
+// NewUserStore initializes the selected backend, loads users, and guarantees at least one admin.
 func NewUserStore(path string) (*UserStore, error) {
 	store := &UserStore{
 		path:   path,
@@ -117,6 +120,7 @@ func NewUserStore(path string) (*UserStore, error) {
 	return store, nil
 }
 
+// Register validates credentials, hashes password and persists the new account.
 func (s *UserStore) Register(username, password string) error {
 	username = normalizeAuthUsername(username)
 	if !validAuthUsername(username) {
@@ -154,6 +158,7 @@ func (s *UserStore) Register(username, password string) error {
 	return s.saveLocked()
 }
 
+// Authenticate validates password and blocks banned accounts from logging in.
 func (s *UserStore) Authenticate(username, password string) (authUser, error) {
 	username = normalizeAuthUsername(username)
 
@@ -197,6 +202,7 @@ func (s *UserStore) List() []authUser {
 	return users
 }
 
+// SetRole updates a user's role while protecting the last active admin.
 func (s *UserStore) SetRole(username string, role UserRole) error {
 	if !validRole(role) {
 		return errInvalidRole
@@ -220,6 +226,7 @@ func (s *UserStore) SetRole(username string, role UserRole) error {
 	return s.saveLocked()
 }
 
+// SetBanned toggles account ban status while preserving at least one active admin.
 func (s *UserStore) SetBanned(username string, banned bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -239,12 +246,14 @@ func (s *UserStore) SetBanned(username string, banned bool) error {
 	return s.saveLocked()
 }
 
+// Close releases backend resources (important for SQLite file handles).
 func (s *UserStore) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.closeStorage()
 }
 
+// load dispatches to the configured storage backend.
 func (s *UserStore) load() error {
 	switch s.format {
 	case userStoreSQLite:
@@ -284,6 +293,7 @@ func (s *UserStore) loadJSON() error {
 	return nil
 }
 
+// ensureAdmin promotes the first user to admin if no admin exists yet.
 func (s *UserStore) ensureAdmin() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -353,6 +363,7 @@ func (s *UserStore) initStorage() error {
 		return fmt.Errorf("open sqlite users db: %w", err)
 	}
 
+	// Schema is created lazily so switching to SQLite requires no manual migration step.
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			username TEXT PRIMARY KEY COLLATE NOCASE,
@@ -377,6 +388,7 @@ func (s *UserStore) closeStorage() error {
 	return s.db.Close()
 }
 
+// loadSQLite reads all users into the in-memory map used by the application.
 func (s *UserStore) loadSQLite() error {
 	if s.db == nil {
 		return errors.New("sqlite store not initialized")
@@ -410,6 +422,7 @@ func (s *UserStore) loadSQLite() error {
 	return nil
 }
 
+// saveSQLiteLocked replaces the table content from the in-memory source of truth.
 func (s *UserStore) saveSQLiteLocked() error {
 	if s.db == nil {
 		return errors.New("sqlite store not initialized")
@@ -452,6 +465,7 @@ func (s *UserStore) saveSQLiteLocked() error {
 	return nil
 }
 
+// detectUserStoreFormat selects SQLite by extension, JSON otherwise.
 func detectUserStoreFormat(path string) userStoreFormat {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".db", ".sqlite", ".sqlite3":
@@ -475,6 +489,7 @@ func NewSessionManager() *SessionManager {
 	return &SessionManager{sessions: make(map[string]session)}
 }
 
+// Create stores a server-side session and sends its token as HttpOnly cookie.
 func (m *SessionManager) Create(w http.ResponseWriter, username string) error {
 	token, err := randomToken(32)
 	if err != nil {
@@ -500,6 +515,7 @@ func (m *SessionManager) Create(w http.ResponseWriter, username string) error {
 	return nil
 }
 
+// Username resolves and validates the current cookie session.
 func (m *SessionManager) Username(r *http.Request) (string, bool) {
 	cookie, err := r.Cookie(authCookieName)
 	if err != nil || cookie.Value == "" {
@@ -596,6 +612,7 @@ func logoutHandler(sessions *SessionManager) http.HandlerFunc {
 	}
 }
 
+// authRequired enforces login and injects the current user into request context.
 func authRequired(sessions *SessionManager, users *UserStore, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username, ok := sessions.Username(r)
@@ -632,6 +649,7 @@ func authRequired(sessions *SessionManager, users *UserStore, next http.Handler)
 	})
 }
 
+// adminRequired restricts routes to admin role only.
 func adminRequired(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, ok := r.Context().Value(currentUserContextKey).(currentUser)

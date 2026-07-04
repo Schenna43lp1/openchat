@@ -1,5 +1,6 @@
 @import url(./css/root.css);
 
+/* Layout and component styles for chat, auth and admin screens. */
 * {
   box-sizing: border-box;
 }
@@ -13,6 +14,7 @@ body {
 }
 
 .splash-screen {
+  /* Fullscreen splash overlay shown until websocket is connected. */
   position: fixed;
   inset: 0;
   z-index: 9999;
