@@ -27,12 +27,13 @@
       <p class="auth-success" role="status">{{.Success}}</p>
       {{end}}
 
-      <div class="users-table" role="table" aria-label="Benutzerrollen">
+      <div class="users-table" role="table" aria-label="Benutzerrollen und Sperren">
         <div class="users-row users-row-head" role="row">
           <span role="columnheader">Name</span>
           <span role="columnheader">Rolle</span>
+          <span role="columnheader">Status</span>
           <span role="columnheader">Erstellt</span>
-          <span role="columnheader">Aktion</span>
+          <span role="columnheader">Aktionen</span>
         </div>
 
         {{range .Users}}
@@ -40,15 +41,35 @@
           <span role="cell">{{.Username}}</span>
           <span role="cell">
             <input type="hidden" name="username" value="{{.Username}}">
+            {{if $.CanChangeRoles}}
             <select name="role" aria-label="Rolle fuer {{.Username}}">
               <option value="admin" {{if eq .Role "admin" }}selected{{end}}>admin</option>
               <option value="moderator" {{if eq .Role "moderator" }}selected{{end}}>moderator</option>
               <option value="user" {{if eq .Role "user" }}selected{{end}}>user</option>
             </select>
+            {{else}}
+            <span class="role-badge">{{.Role}}</span>
+            {{end}}
+          </span>
+          <span role="cell">
+            {{if .Banned}}
+            <span class="status-badge status-badge-banned">gesperrt</span>
+            {{else}}
+            <span class="status-badge">aktiv</span>
+            {{end}}
           </span>
           <span role="cell">{{.CreatedAt}}</span>
           <span role="cell">
-            <button type="submit">Speichern</button>
+            <div class="users-actions">
+              {{if $.CanChangeRoles}}
+              <button type="submit" name="action" value="set_role">Rolle speichern</button>
+              {{end}}
+              {{if .Banned}}
+              <button type="submit" class="button-secondary" name="action" value="toggle_ban">Entsperren</button>
+              {{else}}
+              <button type="submit" class="button-secondary" name="action" value="toggle_ban">Sperren</button>
+              {{end}}
+            </div>
           </span>
         </form>
         {{end}}

@@ -36,7 +36,7 @@
       <div class="account-card">
         <h2>Account</h2>
         <p>{{.Username}} <span class="role-badge">{{.Role}}</span></p>
-        {{if .IsAdmin}}
+        {{if .CanManageUsers}}
         <a class="account-link" href="/admin/users">Benutzer verwalten</a>
         {{end}}
         <form method="post" action="/logout">
