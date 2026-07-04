@@ -43,6 +43,7 @@ var (
 	errInvalidRole        = errors.New("invalid role")
 	errUnknownUser        = errors.New("unknown user")
 	errLastAdmin          = errors.New("cannot change last admin")
+	errUserBanned         = errors.New("user is banned")
 	usernamePattern       = regexp.MustCompile(`^[A-Za-z0-9_.-]{3,32}$`)
 )
 
@@ -51,10 +52,11 @@ type contextKey string
 const currentUserContextKey contextKey = "currentUser"
 
 type authUser struct {
-	Username     string `json:"username"`
-	PasswordHash string `json:"passwordHash"`
+	Username     string   `json:"username"`
+	PasswordHash string   `json:"passwordHash"`
 	Role         UserRole `json:"role"`
-	CreatedAt    string `json:"createdAt"`
+	Banned       bool     `json:"banned,omitempty"`
+	CreatedAt    string   `json:"createdAt"`
 }
 
 type currentUser struct {
@@ -62,10 +64,26 @@ type currentUser struct {
 	Role     UserRole
 }
 
+func staffRequired(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := r.Context().Value(currentUserContextKey).(currentUser)
+		if !ok || !isStaffRole(user.Role) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 type UserStore struct {
 	mu    sync.RWMutex
 	path  string
 	users map[string]authUser
+}
+
+func isStaffRole(role UserRole) bool {
+	return role == RoleAdmin || role == RoleModerator
 }
 
 func NewUserStore(path string) (*UserStore, error) {
@@ -132,6 +150,9 @@ func (s *UserStore) Authenticate(username, password string) (authUser, error) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return authUser{}, errInvalidCredentials
 	}
+	if user.Banned {
+		return authUser{}, errUserBanned
+	}
 
 	return user, nil
 }
@@ -173,11 +194,30 @@ func (s *UserStore) SetRole(username string, role UserRole) error {
 		return errUnknownUser
 	}
 
-	if user.Role == RoleAdmin && role != RoleAdmin && s.adminCountLocked() <= 1 {
+	if user.Role == RoleAdmin && !user.Banned && role != RoleAdmin && s.activeAdminCountLocked() <= 1 {
 		return errLastAdmin
 	}
 
 	user.Role = role
+	s.users[key] = user
+	return s.saveLocked()
+}
+
+func (s *UserStore) SetBanned(username string, banned bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := strings.ToLower(normalizeAuthUsername(username))
+	user, ok := s.users[key]
+	if !ok {
+		return errUnknownUser
+	}
+
+	if user.Role == RoleAdmin && !user.Banned && banned && s.activeAdminCountLocked() <= 1 {
+		return errLastAdmin
+	}
+
+	user.Banned = banned
 	s.users[key] = user
 	return s.saveLocked()
 }
@@ -348,6 +388,16 @@ func (s *UserStore) adminCountLocked() int {
 	return count
 }
 
+func (s *UserStore) activeAdminCountLocked() int {
+	count := 0
+	for _, user := range s.users {
+		if user.Role == RoleAdmin && !user.Banned {
+			count++
+		}
+	}
+	return count
+}
+
 func loginHandler(tmpl *template.Template, users *UserStore, sessions *SessionManager, logger *log.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/login" {
@@ -398,6 +448,15 @@ func authRequired(sessions *SessionManager, users *UserStore, next http.Handler)
 		user, ok := users.Find(username)
 		if !ok {
 			sessions.Clear(w, r)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if user.Banned {
+			sessions.Clear(w, r)
+			if r.URL.Path == "/ws" {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
@@ -486,7 +545,9 @@ func authErrorMessage(err error) string {
 	case errors.Is(err, errUnknownUser):
 		return "Dieser Benutzer wurde nicht gefunden."
 	case errors.Is(err, errLastAdmin):
-		return "Der letzte Admin kann nicht herabgestuft werden."
+		return "Der letzte aktive Admin kann nicht entfernt oder gesperrt werden."
+	case errors.Is(err, errUserBanned):
+		return "Dieser Account wurde gesperrt."
 	default:
 		return "Benutzername oder Passwort ist falsch."
 	}

@@ -46,7 +46,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/", authRequired(sessions, users, indexHandler(tmpl, logger)))
 	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, logger)))
-	mux.Handle("/admin/users", authRequired(sessions, users, adminRequired(adminUsersHandler(adminTmpl, users, logger))))
+	mux.Handle("/admin/users", authRequired(sessions, users, staffRequired(adminUsersHandler(adminTmpl, users, logger))))
 	mux.HandleFunc("/login", loginHandler(loginTmpl, users, sessions, logger))
 	mux.HandleFunc("/logout", logoutHandler(sessions))
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
@@ -68,9 +68,9 @@ func main() {
 }
 
 type indexViewData struct {
-	Username string
-	Role     UserRole
-	IsAdmin  bool
+	Username       string
+	Role           UserRole
+	CanManageUsers bool
 }
 
 func indexHandler(tmpl *template.Template, logger *log.Logger) http.Handler {
@@ -87,9 +87,9 @@ func indexHandler(tmpl *template.Template, logger *log.Logger) http.Handler {
 
 		user, _ := r.Context().Value(currentUserContextKey).(currentUser)
 		data := indexViewData{
-			Username: user.Username,
-			Role:     user.Role,
-			IsAdmin:  user.Role == RoleAdmin,
+			Username:       user.Username,
+			Role:           user.Role,
+			CanManageUsers: isStaffRole(user.Role),
 		}
 		if err := tmpl.Execute(w, data); err != nil {
 			logger.Printf("execute template: %v", err)
