@@ -1,0 +1,110 @@
+/* Shared base styles and reusable UI elements. */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #04110c;
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+button:hover {
+  background: var(--accent-strong);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+.button-secondary {
+  border: 1px solid var(--line);
+  background: #121419;
+  color: var(--text);
+}
+
+.button-secondary:hover {
+  background: #20232b;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: 1.35rem;
+}
+
+h2 {
+  font-size: 1rem;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid #365447;
+  border-radius: 999px;
+  background: #16231d;
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+textarea,
+input,
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #101217;
+  color: var(--text);
+  outline: none;
+}
+
+input {
+  height: 2.8rem;
+  padding: 0 0.85rem;
+}
+
+textarea:focus,
+input:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem rgba(52, 211, 153, 0.12);
+}
+
+.account-link,
+.text-link {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.account-link:hover,
+.text-link:hover {
+  color: var(--accent-strong);
+}

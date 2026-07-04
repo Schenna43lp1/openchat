@@ -1,0 +1,50 @@
+/* Fullscreen loading overlay shown until the app is connected. */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: rgba(16, 17, 20, 0.98);
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 260ms ease, visibility 260ms ease;
+}
+
+.splash-screen.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.splash-card {
+  display: grid;
+  gap: 0.65rem;
+  justify-items: center;
+  min-width: min(20rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.splash-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.splash-loader {
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 3px solid #365447;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: splash-spin 900ms linear infinite;
+}
+
+@keyframes splash-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
