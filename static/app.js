@@ -11,7 +11,7 @@
   const connectionTextEl = document.getElementById("connectionText");
 
   let socket = null;
-  let username = localStorage.getItem("go-chat-username") || "";
+  let username = localStorage.getItem("open-chat-username") || "";
   let reconnectTimer = null;
   let reconnectDelay = 800;
   let manuallyClosed = false;
@@ -28,7 +28,7 @@
     }
 
     username = nextUsername.slice(0, 32);
-    localStorage.setItem("go-chat-username", username);
+    localStorage.setItem("open-chat-username", username);
     joinCardEl.classList.add("is-hidden");
     connect();
   });

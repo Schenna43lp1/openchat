@@ -7,7 +7,7 @@
 *.dll
 *.so
 *.dylib
-
+chat.exe
 # Test binary, built with `go test -c`
 *.test
 
