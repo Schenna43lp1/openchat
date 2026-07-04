@@ -2,36 +2,15 @@
   const messagesEl = document.getElementById("messages");
   const formEl = document.getElementById("messageForm");
   const inputEl = document.getElementById("messageInput");
-  const joinFormEl = document.getElementById("joinForm");
-  const joinCardEl = document.getElementById("joinCard");
-  const usernameInputEl = document.getElementById("usernameInput");
   const usersEl = document.getElementById("users");
   const userCountEl = document.getElementById("userCount");
   const connectionEl = document.getElementById("connectionStatus");
   const connectionTextEl = document.getElementById("connectionText");
 
   let socket = null;
-  let username = localStorage.getItem("open-chat-username") || "";
   let reconnectTimer = null;
   let reconnectDelay = 800;
   let manuallyClosed = false;
-
-  if (username) {
-    usernameInputEl.value = username;
-  }
-
-  joinFormEl.addEventListener("submit", function (event) {
-    event.preventDefault();
-    const nextUsername = usernameInputEl.value.trim().replace(/\s+/g, " ");
-    if (!nextUsername) {
-      return;
-    }
-
-    username = nextUsername.slice(0, 32);
-    localStorage.setItem("open-chat-username", username);
-    joinCardEl.classList.add("is-hidden");
-    connect();
-  });
 
   formEl.addEventListener("submit", function (event) {
     event.preventDefault();
@@ -54,16 +33,14 @@
     }
   });
 
-  function connect() {
-    if (!username) {
-      return;
-    }
+  connect();
 
+  function connect() {
     clearTimeout(reconnectTimer);
     setStatus("connecting", "Verbinde...");
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${protocol}//${window.location.host}/ws?username=${encodeURIComponent(username)}`;
+    const url = `${protocol}//${window.location.host}/ws`;
     socket = new WebSocket(url);
 
     socket.addEventListener("open", function () {
@@ -76,8 +53,12 @@
       handlePayload(payload);
     });
 
-    socket.addEventListener("close", function () {
+    socket.addEventListener("close", function (event) {
       setStatus("offline", "Offline");
+      if (event.code === 1008 || event.code === 1002) {
+        window.location.href = "/login";
+        return;
+      }
       if (!manuallyClosed) {
         scheduleReconnect();
       }

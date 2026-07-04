@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Benutzer | Open chat</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+  <main class="admin-shell">
+    <section class="admin-panel" aria-label="Benutzerverwaltung">
+      <header class="admin-header">
+        <div>
+          <h1>Benutzer</h1>
+          <p>Angemeldet als <strong>{{.CurrentUser.Username}}</strong></p>
+        </div>
+        <a class="text-link" href="/">Zurueck zum Chat</a>
+      </header>
+
+      {{if .Error}}
+      <p class="auth-error" role="alert">{{.Error}}</p>
+      {{end}}
+
+      {{if .Success}}
+      <p class="auth-success" role="status">{{.Success}}</p>
+      {{end}}
+
+      <div class="users-table" role="table" aria-label="Benutzerrollen">
+        <div class="users-row users-row-head" role="row">
+          <span role="columnheader">Name</span>
+          <span role="columnheader">Rolle</span>
+          <span role="columnheader">Erstellt</span>
+          <span role="columnheader">Aktion</span>
+        </div>
+
+        {{range .Users}}
+        <form class="users-row" method="post" action="/admin/users" role="row">
+          <span role="cell">{{.Username}}</span>
+          <span role="cell">
+            <input type="hidden" name="username" value="{{.Username}}">
+            <select name="role" aria-label="Rolle fuer {{.Username}}">
+              <option value="admin" {{if eq .Role "admin" }}selected{{end}}>admin</option>
+              <option value="moderator" {{if eq .Role "moderator" }}selected{{end}}>moderator</option>
+              <option value="user" {{if eq .Role "user" }}selected{{end}}>user</option>
+            </select>
+          </span>
+          <span role="cell">{{.CreatedAt}}</span>
+          <span role="cell">
+            <button type="submit">Speichern</button>
+          </span>
+        </form>
+        {{end}}
+      </div>
+    </section>
+  </main>
+</body>
+
+</html>

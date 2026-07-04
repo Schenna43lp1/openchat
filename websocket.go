@@ -23,9 +23,10 @@ func serveWebSocket(hub *Hub, logger *log.Logger) http.HandlerFunc {
 			return
 		}
 
-		username := sanitizeUsername(r.URL.Query().Get("username"))
+		user, _ := r.Context().Value(currentUserContextKey).(currentUser)
+		username := sanitizeUsername(user.Username)
 		if username == "" {
-			http.Error(w, "username is required", http.StatusBadRequest)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 

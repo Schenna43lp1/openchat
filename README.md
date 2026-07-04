@@ -2,7 +2,6 @@
 
 Ein einfaches Echtzeit-Chat-System mit Go, Gorilla WebSocket und einem responsiven dunklen Frontend.
 
-
 ## Start
 
 ```bash
@@ -14,6 +13,13 @@ Der Server läuft standardmäßig auf:
 
 ```text
 http://localhost:8080
+```
+
+## Docker
+
+```bash
+
+docker run -d --name openchat -p 8080:8080 ghcr.io/schenna43lp1/openchat:latest
 ```
 
 ## Endpunkte
