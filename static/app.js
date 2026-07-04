@@ -6,11 +6,14 @@
   const userCountEl = document.getElementById("userCount");
   const connectionEl = document.getElementById("connectionStatus");
   const connectionTextEl = document.getElementById("connectionText");
+  const splashEl = document.getElementById("splashScreen");
 
   let socket = null;
   let reconnectTimer = null;
   let reconnectDelay = 800;
   let manuallyClosed = false;
+  let splashHidden = false;
+  const splashStartedAt = Date.now();
 
   formEl.addEventListener("submit", function (event) {
     event.preventDefault();
@@ -33,6 +36,7 @@
     }
   });
 
+  setTimeout(hideSplash, 1800);
   connect();
 
   function connect() {
@@ -46,6 +50,7 @@
     socket.addEventListener("open", function () {
       reconnectDelay = 800;
       setStatus("online", "Online");
+      hideSplash();
     });
 
     socket.addEventListener("message", function (event) {
@@ -149,6 +154,22 @@
   function setStatus(state, label) {
     connectionEl.dataset.state = state;
     connectionTextEl.textContent = label;
+  }
+
+  function hideSplash() {
+    if (!splashEl || splashHidden) {
+      return;
+    }
+    const elapsed = Date.now() - splashStartedAt;
+    if (elapsed < 550) {
+      setTimeout(hideSplash, 550 - elapsed);
+      return;
+    }
+    splashHidden = true;
+    splashEl.classList.add("is-hidden");
+    setTimeout(function () {
+      splashEl.remove();
+    }, 300);
   }
 
   function resizeComposer() {
