@@ -2,22 +2,6 @@
 
 Ein einfaches Echtzeit-Chat-System mit Go, Gorilla WebSocket und einem responsiven dunklen Frontend.
 
-## Funktionen
-
-- Backend ausschließlich in Go
-- Keine Datenbank, Nachrichten werden im RAM gehalten
-- WebSocket-Kommunikation in Echtzeit
-- Mehrere gleichzeitige Benutzer
-- Benutzername beim Verbinden
-- Broadcast an alle verbundenen Clients
-- Join- und Leave-Nachrichten
-- Zeitstempel pro Nachricht
-- Online-Benutzerliste
-- Ping/Pong zum Offenhalten der Verbindung
-- Graceful Shutdown per `Ctrl+C` oder `SIGTERM`
-- Automatische Client-Wiederverbindung
-- Enter sendet, Shift+Enter erzeugt eine neue Zeile
-- Responsives dunkles UI
 
 ## Start
 
