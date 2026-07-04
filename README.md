@@ -26,6 +26,7 @@ docker run -d --name openchat -p 8080:8080 ghcr.io/schenna43lp1/openchat:latest
 
 - `GET /` liefert das Frontend
 - `GET /ws` öffnet die WebSocket-Verbindung
+- `GET|POST /admin/users` Benutzerverwaltung (Admins: Rollen + Sperren, Moderatoren: Sperren)
 - `GET /static/*` liefert CSS und JavaScript
 
 ## Projektstruktur
