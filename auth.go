@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	_ "modernc.org/sqlite"
 )
 
 const (
@@ -77,10 +79,19 @@ func staffRequired(next http.Handler) http.Handler {
 }
 
 type UserStore struct {
-	mu    sync.RWMutex
-	path  string
-	users map[string]authUser
+	mu     sync.RWMutex
+	path   string
+	format userStoreFormat
+	db     *sql.DB
+	users  map[string]authUser
 }
+
+type userStoreFormat string
+
+const (
+	userStoreJSON   userStoreFormat = "json"
+	userStoreSQLite userStoreFormat = "sqlite"
+)
 
 func isStaffRole(role UserRole) bool {
 	return role == RoleAdmin || role == RoleModerator
@@ -88,13 +99,19 @@ func isStaffRole(role UserRole) bool {
 
 func NewUserStore(path string) (*UserStore, error) {
 	store := &UserStore{
-		path:  path,
-		users: make(map[string]authUser),
+		path:   path,
+		format: detectUserStoreFormat(path),
+		users:  make(map[string]authUser),
+	}
+	if err := store.initStorage(); err != nil {
+		return nil, err
 	}
 	if err := store.load(); err != nil {
+		_ = store.closeStorage()
 		return nil, err
 	}
 	if err := store.ensureAdmin(); err != nil {
+		_ = store.closeStorage()
 		return nil, err
 	}
 	return store, nil
@@ -222,7 +239,22 @@ func (s *UserStore) SetBanned(username string, banned bool) error {
 	return s.saveLocked()
 }
 
+func (s *UserStore) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.closeStorage()
+}
+
 func (s *UserStore) load() error {
+	switch s.format {
+	case userStoreSQLite:
+		return s.loadSQLite()
+	default:
+		return s.loadJSON()
+	}
+}
+
+func (s *UserStore) loadJSON() error {
 	raw, err := os.ReadFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -273,6 +305,15 @@ func (s *UserStore) ensureAdmin() error {
 }
 
 func (s *UserStore) saveLocked() error {
+	switch s.format {
+	case userStoreSQLite:
+		return s.saveSQLiteLocked()
+	default:
+		return s.saveJSONLocked()
+	}
+}
+
+func (s *UserStore) saveJSONLocked() error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return fmt.Errorf("create data dir: %w", err)
 	}
@@ -296,6 +337,128 @@ func (s *UserStore) saveLocked() error {
 	}
 
 	return nil
+}
+
+func (s *UserStore) initStorage() error {
+	if s.format != userStoreSQLite {
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+		return fmt.Errorf("create data dir: %w", err)
+	}
+
+	db, err := sql.Open("sqlite", s.path)
+	if err != nil {
+		return fmt.Errorf("open sqlite users db: %w", err)
+	}
+
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS users (
+			username TEXT PRIMARY KEY COLLATE NOCASE,
+			password_hash TEXT NOT NULL,
+			role TEXT NOT NULL,
+			banned INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL
+		)
+	`); err != nil {
+		_ = db.Close()
+		return fmt.Errorf("create sqlite users schema: %w", err)
+	}
+
+	s.db = db
+	return nil
+}
+
+func (s *UserStore) closeStorage() error {
+	if s.db == nil {
+		return nil
+	}
+	return s.db.Close()
+}
+
+func (s *UserStore) loadSQLite() error {
+	if s.db == nil {
+		return errors.New("sqlite store not initialized")
+	}
+
+	rows, err := s.db.Query(`SELECT username, password_hash, role, banned, created_at FROM users`)
+	if err != nil {
+		return fmt.Errorf("query sqlite users: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user authUser
+		var banned int
+		if err := rows.Scan(&user.Username, &user.PasswordHash, &user.Role, &banned, &user.CreatedAt); err != nil {
+			return fmt.Errorf("scan sqlite user: %w", err)
+		}
+		if user.Username == "" || user.PasswordHash == "" {
+			continue
+		}
+		if !validRole(user.Role) {
+			user.Role = RoleUser
+		}
+		user.Banned = banned != 0
+		s.users[strings.ToLower(user.Username)] = user
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate sqlite users: %w", err)
+	}
+	return nil
+}
+
+func (s *UserStore) saveSQLiteLocked() error {
+	if s.db == nil {
+		return errors.New("sqlite store not initialized")
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin sqlite transaction: %w", err)
+	}
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if _, err := tx.Exec(`DELETE FROM users`); err != nil {
+		return fmt.Errorf("clear sqlite users: %w", err)
+	}
+
+	stmt, err := tx.Prepare(`INSERT INTO users (username, password_hash, role, banned, created_at) VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("prepare sqlite insert: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, user := range s.users {
+		banned := 0
+		if user.Banned {
+			banned = 1
+		}
+		if _, err := stmt.Exec(user.Username, user.PasswordHash, string(user.Role), banned, user.CreatedAt); err != nil {
+			return fmt.Errorf("insert sqlite user: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit sqlite transaction: %w", err)
+	}
+	tx = nil
+	return nil
+}
+
+func detectUserStoreFormat(path string) userStoreFormat {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".db", ".sqlite", ".sqlite3":
+		return userStoreSQLite
+	default:
+		return userStoreJSON
+	}
 }
 
 type SessionManager struct {

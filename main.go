@@ -34,10 +34,15 @@ func main() {
 		logger.Fatalf("parse admin template: %v", err)
 	}
 
-	users, err := NewUserStore(usersFile)
+	users, err := NewUserStore(resolveUsersStorePath())
 	if err != nil {
 		logger.Fatalf("load users: %v", err)
 	}
+	defer func() {
+		if err := users.Close(); err != nil {
+			logger.Printf("close user store: %v", err)
+		}
+	}()
 	sessions := NewSessionManager()
 
 	hub := NewHub(logger)
@@ -126,4 +131,11 @@ func waitForShutdown(logger *log.Logger, server *http.Server, hub *Hub) {
 	}
 
 	logger.Println("server stopped")
+}
+
+func resolveUsersStorePath() string {
+	if path := os.Getenv("OPENCHAT_USERS_FILE"); path != "" {
+		return path
+	}
+	return usersFile
 }

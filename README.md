@@ -9,6 +9,16 @@ go mod tidy
 go run .
 ```
 
+Optional kannst du statt JSON auch SQLite fuer die Benutzerdaten verwenden:
+
+```bash
+# Beispiel:
+set OPENCHAT_USERS_FILE=data\users.sqlite
+go run .
+```
+
+Standard bleibt `data/users.json`. Bei Dateiendungen `.db`, `.sqlite` oder `.sqlite3` nutzt Open chat automatisch SQLite.
+
 Der Server läuft standardmäßig auf:
 
 ```text
