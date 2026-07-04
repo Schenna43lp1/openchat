@@ -24,12 +24,31 @@ func main() {
 		logger.Fatalf("parse template: %v", err)
 	}
 
+	loginTmpl, err := template.ParseFiles("templates/login.html")
+	if err != nil {
+		logger.Fatalf("parse login template: %v", err)
+	}
+
+	adminTmpl, err := template.ParseFiles("templates/admin.html")
+	if err != nil {
+		logger.Fatalf("parse admin template: %v", err)
+	}
+
+	users, err := NewUserStore(usersFile)
+	if err != nil {
+		logger.Fatalf("load users: %v", err)
+	}
+	sessions := NewSessionManager()
+
 	hub := NewHub(logger)
 	go hub.Run()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", indexHandler(tmpl, logger))
-	mux.HandleFunc("/ws", serveWebSocket(hub, logger))
+	mux.Handle("/", authRequired(sessions, users, indexHandler(tmpl, logger)))
+	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, logger)))
+	mux.Handle("/admin/users", authRequired(sessions, users, adminRequired(adminUsersHandler(adminTmpl, users, logger))))
+	mux.HandleFunc("/login", loginHandler(loginTmpl, users, sessions, logger))
+	mux.HandleFunc("/logout", logoutHandler(sessions))
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	server := &http.Server{
@@ -48,8 +67,14 @@ func main() {
 	waitForShutdown(logger, server, hub)
 }
 
-func indexHandler(tmpl *template.Template, logger *log.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+type indexViewData struct {
+	Username string
+	Role     UserRole
+	IsAdmin  bool
+}
+
+func indexHandler(tmpl *template.Template, logger *log.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
@@ -60,11 +85,17 @@ func indexHandler(tmpl *template.Template, logger *log.Logger) http.HandlerFunc 
 			return
 		}
 
-		if err := tmpl.Execute(w, nil); err != nil {
+		user, _ := r.Context().Value(currentUserContextKey).(currentUser)
+		data := indexViewData{
+			Username: user.Username,
+			Role:     user.Role,
+			IsAdmin:  user.Role == RoleAdmin,
+		}
+		if err := tmpl.Execute(w, data); err != nil {
 			logger.Printf("execute template: %v", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 		}
-	}
+	})
 }
 
 func loggingMiddleware(logger *log.Logger, next http.Handler) http.Handler {

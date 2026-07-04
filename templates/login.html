@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login | Open chat</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+  <main class="auth-shell">
+    <section class="auth-panel" aria-label="Anmeldung">
+      <header class="auth-header">
+        <h1>Open chat</h1>
+        <p>Melde dich an oder erstelle einen Account.</p>
+      </header>
+
+      {{if .Error}}
+      <p class="auth-error" role="alert">{{.Error}}</p>
+      {{end}}
+
+      <form class="auth-form" method="post" action="/login">
+        <input type="hidden" name="mode" id="authMode" value="{{.Mode}}">
+
+        <label for="username">Benutzername</label>
+        <input id="username" name="username" type="text" maxlength="32" pattern="[A-Za-z0-9_.-]{3,32}"
+          autocomplete="username" value="{{.Username}}" required>
+
+        <label for="password">Passwort</label>
+        <input id="password" name="password" type="password" minlength="8" maxlength="128"
+          autocomplete="current-password" required>
+
+        <div class="auth-actions">
+          <button type="submit" data-mode-submit="login">Einloggen</button>
+          <button type="submit" class="button-secondary" data-mode-submit="register">Registrieren</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    document.querySelectorAll("[data-mode-submit]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        document.getElementById("authMode").value = button.dataset.modeSubmit;
+        document.getElementById("password").autocomplete =
+          button.dataset.modeSubmit === "register" ? "new-password" : "current-password";
+      });
+    });
+  </script>
+</body>
+
+</html>
