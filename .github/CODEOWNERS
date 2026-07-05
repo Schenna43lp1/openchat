@@ -1,0 +1,12 @@
+# Default code owners
+* @Schenna43lp1
+
+# CI/CD and GitHub configuration
+.github/** @Schenna43lp1
+
+# Backend
+*.go @Schenna43lp1
+
+# Frontend
+static/** @Schenna43lp1
+templates/** @Schenna43lp1
