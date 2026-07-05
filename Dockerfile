@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1
 
+<<<<<<< HEAD
 FROM golang:1.25.1-alpine AS build
+=======
+FROM golang:1.25-alpine AS build
+>>>>>>> 4ed6e436ea6c58193a8d52f746d0c12e65739412
 
 WORKDIR /src
 
