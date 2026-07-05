@@ -2,6 +2,7 @@
 
 Ein leichtgewichtiges Echtzeit-Chat-System mit:
 
+<<<<<<< HEAD
 - Go (HTTP-Server + Auth + Rollenverwaltung)
 - Gorilla WebSocket (Live-Nachrichten)
 - responsivem Frontend (Chat, Login, Admin-Bereich)
@@ -30,6 +31,11 @@ Ein leichtgewichtiges Echtzeit-Chat-System mit:
 - Optional Docker, wenn du Container nutzen willst
 
 ## Schnellstart (lokal)
+=======
+
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Schenna43lp1/openchat/.github%2Fworkflows%2Fdocker-image.yml)
+## Start
+>>>>>>> 108f546412f7da843fdb1397ce644e96168a27e8
 
 ```bash
 go mod tidy
