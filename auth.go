@@ -509,7 +509,7 @@ func (m *SessionManager) Create(w http.ResponseWriter, username string) error {
 		MaxAge:   int(sessionDuration.Seconds()),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   false,
+		Secure:   true,
 	})
 
 	return nil
@@ -548,6 +548,7 @@ func (m *SessionManager) Clear(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
+		Secure:   true,
 	})
 }
 
