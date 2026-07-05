@@ -1,61 +1,111 @@
-# Go Chat
-
-Ein einfaches Echtzeit-Chat-System mit Go, Gorilla WebSocket und einem responsiven dunklen Frontend.
-
+# Open chat
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Schenna43lp1/openchat/.github%2Fworkflows%2Fdocker-image.yml)
-## Start
+![CodeQL](https://img.shields.io/github/actions/workflow/status/Schenna43lp1/openchat/codeql.yml?label=codeql)
+
+Ein leichtgewichtiges Echtzeit-Chat-System mit:
+
+- Go (HTTP-Server + Auth + Rollenverwaltung)
+- Gorilla WebSocket (Live-Nachrichten)
+- responsivem Frontend (Chat, Login, Admin-Bereich)
+- JSON **oder** SQLite als User-Storage
+
+## Schnellstart
 
 ```bash
 go mod tidy
 go run .
 ```
 
-Optional kannst du statt JSON auch SQLite fuer die Benutzerdaten verwenden:
-
-```bash
-# Beispiel:
-set OPENCHAT_USERS_FILE=data\users.sqlite
-go run .
-```
-
-Standard bleibt `data/users.json`. Bei Dateiendungen `.db`, `.sqlite` oder `.sqlite3` nutzt Open chat automatisch SQLite.
-
-Der Server läuft standardmäßig auf:
+Server:
 
 ```text
 http://localhost:8080
 ```
 
-## Docker
+## Konfiguration
 
-```bash
+### User-Storage (JSON/SQLite)
 
-docker run -d --name openchat -p 8080:8080 ghcr.io/schenna43lp1/openchat:latest
-# Dev-Image:
-docker run -d --name openchat-dev -p 8080:8080 ghcr.io/schenna43lp1/openchat:dev
+Default:
+
+- `data/users.json`
+
+Override:
+
+```powershell
+set OPENCHAT_USERS_FILE=data\users.sqlite
+go run .
 ```
+
+Dateiendungen:
+
+- `.json` -> JSON
+- `.db`, `.sqlite`, `.sqlite3` -> SQLite
+
+### WebSocket Origin-Whitelist
+
+Standard: gleiche Host-Origin wie der Request (`Origin` muss zu `Host` passen).
+
+Optional zusätzliche erlaubte Origins:
+
+```powershell
+set OPENCHAT_ALLOWED_ORIGINS=https://chat.example.com,https://app.example.com
+go run .
+```
+
+## Rollen
+
+- `admin`: Rollen ändern + sperren/entsperren
+- `moderator`: sperren/entsperren (nur Nutzer mit Rolle `user`)
+- `user`: Chat-Nutzung
+
+Regeln:
+
+- letzter aktiver Admin kann nicht entfernt/gesperrt werden
+- gesperrte Nutzer können sich nicht anmelden
 
 ## Endpunkte
 
-- `GET /` liefert das Frontend
-- `GET /ws` öffnet die WebSocket-Verbindung
-- `GET|POST /admin/users` Benutzerverwaltung (Admins: Rollen + Sperren, Moderatoren: Sperren)
-- `GET /static/*` liefert CSS und JavaScript
+- `GET /` - Chat-Frontend (auth required)
+- `GET /ws` - WebSocket (auth required)
+- `GET|POST /admin/users` - Benutzerverwaltung (staff required)
+- `GET|POST /login` - Login/Registrierung
+- `POST /logout` - Logout
+- `GET /static/*` - statische Assets
 
-## Projektstruktur
+## Docker
 
-```text
-chat/
-├── main.go
-├── websocket.go
-├── hub.go
-├── client.go
-├── templates/
-│   └── index.html
-├── static/
-│   ├── style.css
-│   └── app.js
-├── go.mod
-└── README.md
+Stable:
+
+```bash
+docker run -d --name openchat -p 8080:8080 ghcr.io/schenna43lp1/openchat:latest
+```
+
+Dev:
+
+```bash
+docker run -d --name openchat-dev -p 8080:8080 ghcr.io/schenna43lp1/openchat:dev
+```
+
+## CI/CD & Security
+
+- `CI Test`: `.github/workflows/ci-test.yml`
+- `CodeQL`: `.github/workflows/codeql.yml`
+- Docker Build/Publish: `.github/workflows/docker-image.yml`
+- Dependabot: `.github/dependabot.yml`
+- PR Labeler: `.github/workflows/pr-labeler.yml` + `.github/labeler.yml`
+
+## Dokumentation
+
+- Endnutzer Quickstart: `docs/QUICKSTART.md`
+- Entwickler-Doku (Flows/Sequenzen): `docs/DEVELOPER_GUIDE.md`
+- Vollständige Projektdoku: `docs/DOKUMENTATION.md`
+- Security Policy: `SECURITY.md`
+- Contribution/Commit-Konvention: `CONTRIBUTING.md`
+
+## Tests
+
+```bash
+go test ./...
 ```

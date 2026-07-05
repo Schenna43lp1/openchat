@@ -1,0 +1,33 @@
+name: CI Test
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - release/*
+  pull_request:
+    branches:
+      - main
+      - dev
+      - release/*
+
+permissions:
+  contents: read
+
+jobs:
+  go-test:
+    name: go test ./...
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test ./...
