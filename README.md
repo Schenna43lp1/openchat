@@ -2,12 +2,24 @@
 
 Ein einfaches Echtzeit-Chat-System mit Go, Gorilla WebSocket und einem responsiven dunklen Frontend.
 
+
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Schenna43lp1/openchat/.github%2Fworkflows%2Fdocker-image.yml)
 ## Start
 
 ```bash
 go mod tidy
 go run .
 ```
+
+Optional kannst du statt JSON auch SQLite fuer die Benutzerdaten verwenden:
+
+```bash
+# Beispiel:
+set OPENCHAT_USERS_FILE=data\users.sqlite
+go run .
+```
+
+Standard bleibt `data/users.json`. Bei Dateiendungen `.db`, `.sqlite` oder `.sqlite3` nutzt Open chat automatisch SQLite.
 
 Der Server läuft standardmäßig auf:
 

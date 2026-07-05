@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	_ "modernc.org/sqlite"
 )
 
 const (
@@ -64,6 +66,7 @@ type currentUser struct {
 	Role     UserRole
 }
 
+// staffRequired grants access to admins and moderators.
 func staffRequired(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, ok := r.Context().Value(currentUserContextKey).(currentUser)
@@ -77,29 +80,47 @@ func staffRequired(next http.Handler) http.Handler {
 }
 
 type UserStore struct {
-	mu    sync.RWMutex
-	path  string
-	users map[string]authUser
+	mu     sync.RWMutex
+	path   string
+	format userStoreFormat
+	db     *sql.DB
+	users  map[string]authUser
 }
+
+// userStoreFormat defines the persistence backend for users.
+type userStoreFormat string
+
+const (
+	userStoreJSON   userStoreFormat = "json"
+	userStoreSQLite userStoreFormat = "sqlite"
+)
 
 func isStaffRole(role UserRole) bool {
 	return role == RoleAdmin || role == RoleModerator
 }
 
+// NewUserStore initializes the selected backend, loads users, and guarantees at least one admin.
 func NewUserStore(path string) (*UserStore, error) {
 	store := &UserStore{
-		path:  path,
-		users: make(map[string]authUser),
+		path:   path,
+		format: detectUserStoreFormat(path),
+		users:  make(map[string]authUser),
+	}
+	if err := store.initStorage(); err != nil {
+		return nil, err
 	}
 	if err := store.load(); err != nil {
+		_ = store.closeStorage()
 		return nil, err
 	}
 	if err := store.ensureAdmin(); err != nil {
+		_ = store.closeStorage()
 		return nil, err
 	}
 	return store, nil
 }
 
+// Register validates credentials, hashes password and persists the new account.
 func (s *UserStore) Register(username, password string) error {
 	username = normalizeAuthUsername(username)
 	if !validAuthUsername(username) {
@@ -137,6 +158,7 @@ func (s *UserStore) Register(username, password string) error {
 	return s.saveLocked()
 }
 
+// Authenticate validates password and blocks banned accounts from logging in.
 func (s *UserStore) Authenticate(username, password string) (authUser, error) {
 	username = normalizeAuthUsername(username)
 
@@ -180,6 +202,7 @@ func (s *UserStore) List() []authUser {
 	return users
 }
 
+// SetRole updates a user's role while protecting the last active admin.
 func (s *UserStore) SetRole(username string, role UserRole) error {
 	if !validRole(role) {
 		return errInvalidRole
@@ -203,6 +226,7 @@ func (s *UserStore) SetRole(username string, role UserRole) error {
 	return s.saveLocked()
 }
 
+// SetBanned toggles account ban status while preserving at least one active admin.
 func (s *UserStore) SetBanned(username string, banned bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -222,7 +246,24 @@ func (s *UserStore) SetBanned(username string, banned bool) error {
 	return s.saveLocked()
 }
 
+// Close releases backend resources (important for SQLite file handles).
+func (s *UserStore) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.closeStorage()
+}
+
+// load dispatches to the configured storage backend.
 func (s *UserStore) load() error {
+	switch s.format {
+	case userStoreSQLite:
+		return s.loadSQLite()
+	default:
+		return s.loadJSON()
+	}
+}
+
+func (s *UserStore) loadJSON() error {
 	raw, err := os.ReadFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -252,6 +293,7 @@ func (s *UserStore) load() error {
 	return nil
 }
 
+// ensureAdmin promotes the first user to admin if no admin exists yet.
 func (s *UserStore) ensureAdmin() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -273,6 +315,15 @@ func (s *UserStore) ensureAdmin() error {
 }
 
 func (s *UserStore) saveLocked() error {
+	switch s.format {
+	case userStoreSQLite:
+		return s.saveSQLiteLocked()
+	default:
+		return s.saveJSONLocked()
+	}
+}
+
+func (s *UserStore) saveJSONLocked() error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return fmt.Errorf("create data dir: %w", err)
 	}
@@ -298,6 +349,132 @@ func (s *UserStore) saveLocked() error {
 	return nil
 }
 
+func (s *UserStore) initStorage() error {
+	if s.format != userStoreSQLite {
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+		return fmt.Errorf("create data dir: %w", err)
+	}
+
+	db, err := sql.Open("sqlite", s.path)
+	if err != nil {
+		return fmt.Errorf("open sqlite users db: %w", err)
+	}
+
+	// Schema is created lazily so switching to SQLite requires no manual migration step.
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS users (
+			username TEXT PRIMARY KEY COLLATE NOCASE,
+			password_hash TEXT NOT NULL,
+			role TEXT NOT NULL,
+			banned INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL
+		)
+	`); err != nil {
+		_ = db.Close()
+		return fmt.Errorf("create sqlite users schema: %w", err)
+	}
+
+	s.db = db
+	return nil
+}
+
+func (s *UserStore) closeStorage() error {
+	if s.db == nil {
+		return nil
+	}
+	return s.db.Close()
+}
+
+// loadSQLite reads all users into the in-memory map used by the application.
+func (s *UserStore) loadSQLite() error {
+	if s.db == nil {
+		return errors.New("sqlite store not initialized")
+	}
+
+	rows, err := s.db.Query(`SELECT username, password_hash, role, banned, created_at FROM users`)
+	if err != nil {
+		return fmt.Errorf("query sqlite users: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user authUser
+		var banned int
+		if err := rows.Scan(&user.Username, &user.PasswordHash, &user.Role, &banned, &user.CreatedAt); err != nil {
+			return fmt.Errorf("scan sqlite user: %w", err)
+		}
+		if user.Username == "" || user.PasswordHash == "" {
+			continue
+		}
+		if !validRole(user.Role) {
+			user.Role = RoleUser
+		}
+		user.Banned = banned != 0
+		s.users[strings.ToLower(user.Username)] = user
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate sqlite users: %w", err)
+	}
+	return nil
+}
+
+// saveSQLiteLocked replaces the table content from the in-memory source of truth.
+func (s *UserStore) saveSQLiteLocked() error {
+	if s.db == nil {
+		return errors.New("sqlite store not initialized")
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin sqlite transaction: %w", err)
+	}
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if _, err := tx.Exec(`DELETE FROM users`); err != nil {
+		return fmt.Errorf("clear sqlite users: %w", err)
+	}
+
+	stmt, err := tx.Prepare(`INSERT INTO users (username, password_hash, role, banned, created_at) VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("prepare sqlite insert: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, user := range s.users {
+		banned := 0
+		if user.Banned {
+			banned = 1
+		}
+		if _, err := stmt.Exec(user.Username, user.PasswordHash, string(user.Role), banned, user.CreatedAt); err != nil {
+			return fmt.Errorf("insert sqlite user: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit sqlite transaction: %w", err)
+	}
+	tx = nil
+	return nil
+}
+
+// detectUserStoreFormat selects SQLite by extension, JSON otherwise.
+func detectUserStoreFormat(path string) userStoreFormat {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".db", ".sqlite", ".sqlite3":
+		return userStoreSQLite
+	default:
+		return userStoreJSON
+	}
+}
+
 type SessionManager struct {
 	mu       sync.RWMutex
 	sessions map[string]session
@@ -312,6 +489,7 @@ func NewSessionManager() *SessionManager {
 	return &SessionManager{sessions: make(map[string]session)}
 }
 
+// Create stores a server-side session and sends its token as HttpOnly cookie.
 func (m *SessionManager) Create(w http.ResponseWriter, username string) error {
 	token, err := randomToken(32)
 	if err != nil {
@@ -337,6 +515,7 @@ func (m *SessionManager) Create(w http.ResponseWriter, username string) error {
 	return nil
 }
 
+// Username resolves and validates the current cookie session.
 func (m *SessionManager) Username(r *http.Request) (string, bool) {
 	cookie, err := r.Cookie(authCookieName)
 	if err != nil || cookie.Value == "" {
@@ -433,6 +612,7 @@ func logoutHandler(sessions *SessionManager) http.HandlerFunc {
 	}
 }
 
+// authRequired enforces login and injects the current user into request context.
 func authRequired(sessions *SessionManager, users *UserStore, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username, ok := sessions.Username(r)
@@ -469,6 +649,7 @@ func authRequired(sessions *SessionManager, users *UserStore, next http.Handler)
 	})
 }
 
+// adminRequired restricts routes to admin role only.
 func adminRequired(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, ok := r.Context().Value(currentUserContextKey).(currentUser)

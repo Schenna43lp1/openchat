@@ -16,6 +16,8 @@ type adminUsersViewData struct {
 	Success        string
 }
 
+// adminUsersHandler renders and processes the user management screen.
+// Admins can change roles and ban/unban users, moderators can only ban/unban users.
 func adminUsersHandler(tmpl *template.Template, users *UserStore, logger *log.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/admin/users" {
@@ -44,6 +46,7 @@ func adminUsersHandler(tmpl *template.Template, users *UserStore, logger *log.Lo
 			action := r.FormValue("action")
 			switch action {
 			case "toggle_ban":
+				// Ban/Unban always works against the latest state from storage.
 				target, ok := users.Find(username)
 				if !ok {
 					data.Error = authErrorMessage(errUnknownUser)
@@ -68,6 +71,7 @@ func adminUsersHandler(tmpl *template.Template, users *UserStore, logger *log.Lo
 					data.Success = "Account wurde entsperrt."
 				}
 			case "set_role", "":
+				// Role changes are explicitly restricted to admins.
 				if current.Role != RoleAdmin {
 					data.Error = "Nur Admins duerfen Rollen aendern."
 					break
@@ -90,6 +94,7 @@ func adminUsersHandler(tmpl *template.Template, users *UserStore, logger *log.Lo
 	})
 }
 
+// renderAdminUsers executes the admin template with prebuilt view data.
 func renderAdminUsers(w http.ResponseWriter, tmpl *template.Template, data adminUsersViewData, logger *log.Logger) {
 	if err := tmpl.Execute(w, data); err != nil {
 		logger.Printf("execute admin template: %v", err)

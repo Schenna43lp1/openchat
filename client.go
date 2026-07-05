@@ -31,6 +31,7 @@ type inboundMessage struct {
 	Message string `json:"message"`
 }
 
+// readPump consumes websocket frames, validates payloads and forwards chat messages to the hub.
 func (c *Client) readPump() {
 	defer func() {
 		c.hub.unregister <- c
@@ -68,6 +69,7 @@ func (c *Client) readPump() {
 	}
 }
 
+// writePump sends outbound events and periodic ping frames.
 func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -98,6 +100,7 @@ func (c *Client) writePump() {
 	}
 }
 
+// sanitizeMessage trims input and enforces maximum payload size.
 func sanitizeMessage(message string) string {
 	message = strings.TrimSpace(message)
 	if len(message) > maxMessageSize {

@@ -33,6 +33,7 @@
         <input id="password" name="password" type="password" minlength="8" maxlength="128"
           autocomplete="current-password" required>
 
+        <!-- Two submit buttons share one form and switch mode via inline script below. -->
         <div class="auth-actions">
           <button type="submit" data-mode-submit="login">Einloggen</button>
           <button type="submit" class="button-secondary" data-mode-submit="register">Registrieren</button>
@@ -50,6 +51,10 @@
       });
     });
   </script>
+  <footer class="auth-footer">
+    <p>Open chat &copy; 2026</p>
+    <p>Made with ❤️ by <a href="https://markusstuefer.com">Markus Stuefer</a></p>
+  </footer>
 </body>
 
 </html>

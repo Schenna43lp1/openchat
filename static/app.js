@@ -1,4 +1,5 @@
 (function () {
+  // Main chat client: handles socket lifecycle, rendering and composer UX.
   const messagesEl = document.getElementById("messages");
   const formEl = document.getElementById("messageForm");
   const inputEl = document.getElementById("messageInput");
@@ -60,6 +61,7 @@
 
     socket.addEventListener("close", function (event) {
       setStatus("offline", "Offline");
+      // Policy/protocol close codes indicate auth/session problems.
       if (event.code === 1008 || event.code === 1002) {
         window.location.href = "/login";
         return;
@@ -76,6 +78,7 @@
   }
 
   function scheduleReconnect() {
+    // Exponential backoff avoids aggressive reconnect storms.
     clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(connect, reconnectDelay);
     reconnectDelay = Math.min(reconnectDelay * 1.7, 8000);
@@ -162,6 +165,7 @@
     }
     const elapsed = Date.now() - splashStartedAt;
     if (elapsed < 550) {
+      // Keep splash visible for a short minimum duration to avoid flicker.
       setTimeout(hideSplash, 550 - elapsed);
       return;
     }

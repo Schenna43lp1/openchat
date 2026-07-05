@@ -12,6 +12,15 @@ chat.exe
 *.test
 .env
 data/
+data/sqlite.*
+data/sqlite3.*
+data/chat.db
+data/chat.db-shm
+data/chat.db-wal
+data/chat.db-journal
+data/chat.db.lock
+data/chat.db-tmp
+
 
 # Code coverage profiles and other test artifacts
 *.out

@@ -1,0 +1,68 @@
+/* Responsive breakpoints across chat/auth/admin pages. */
+@media (max-width: 820px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .chat-panel {
+    min-height: 72vh;
+  }
+
+  .sidebar {
+    grid-template-rows: auto auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    width: 100vw;
+    min-height: 100vh;
+    margin: 0;
+  }
+
+  .chat-panel,
+  .account-card,
+  .users-panel {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .chat-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .composer {
+    grid-template-columns: 1fr;
+  }
+
+  .composer button {
+    min-height: 2.8rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .auth-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .admin-shell {
+    padding: 0;
+  }
+
+  .admin-panel {
+    min-height: 100vh;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .admin-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

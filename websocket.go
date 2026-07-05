@@ -16,6 +16,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// serveWebSocket upgrades authenticated HTTP requests and registers chat clients at the hub.
 func serveWebSocket(hub *Hub, logger *log.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -51,6 +52,7 @@ func serveWebSocket(hub *Hub, logger *log.Logger) http.HandlerFunc {
 	}
 }
 
+// sanitizeUsername ensures websocket identity is compact and printable.
 func sanitizeUsername(username string) string {
 	username = strings.TrimSpace(username)
 	username = strings.Join(strings.Fields(username), " ")
