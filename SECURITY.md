@@ -2,20 +2,30 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Security fixes are provided for the latest state of:
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+- `main`
+- `dev`
+
+Older snapshots/tags are not guaranteed to receive backported security updates.
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
+Please do **not** report vulnerabilities in public issues, pull requests, or discussions.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Use private disclosure through GitHub Security Advisories:
+
+https://github.com/Schenna43lp1/openchat/security/advisories/new
+
+To help triage quickly, include:
+
+- affected commit/version/image tag
+- impact and attack scenario
+- reproduction steps / proof of concept
+- suggested mitigation (optional)
+
+## Response Process
+
+- Initial acknowledgement target: within 72 hours
+- Status updates are shared in the private advisory thread
+- A fix is prepared, reviewed, and then published with release notes

@@ -1,0 +1,27 @@
+backend:
+  - changed-files:
+      - any-glob-to-any-file: "*.go"
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "static/**"
+          - "templates/**"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "README.md"
+          - "docs/**"
+          - "**/*.md"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/workflows/**"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "go.mod"
+          - "go.sum"
+          - "Dockerfile"
