@@ -3,11 +3,14 @@
   const messagesEl = document.getElementById("messages");
   const formEl = document.getElementById("messageForm");
   const inputEl = document.getElementById("messageInput");
+  const directTargetEl = document.getElementById("directTarget");
   const usersEl = document.getElementById("users");
   const userCountEl = document.getElementById("userCount");
   const connectionEl = document.getElementById("connectionStatus");
   const connectionTextEl = document.getElementById("connectionText");
   const splashEl = document.getElementById("splashScreen");
+  const currentUserEl = document.getElementById("currentUser");
+  const currentUsername = currentUserEl ? currentUserEl.textContent.trim() : "";
 
   let socket = null;
   let reconnectTimer = null;
@@ -90,7 +93,13 @@
       return;
     }
 
-    socket.send(JSON.stringify({ message: text }));
+    const recipient = directTargetEl ? directTargetEl.value.trim() : "";
+    const payload = { message: text };
+    if (recipient !== "") {
+      payload.to = recipient;
+    }
+
+    socket.send(JSON.stringify(payload));
     inputEl.value = "";
     resizeComposer();
   }
@@ -102,6 +111,7 @@
         (payload.messages || []).forEach(addMessage);
         break;
       case "message":
+      case "direct":
       case "system":
         addMessage(payload);
         break;
@@ -115,7 +125,7 @@
 
   function addMessage(message) {
     const entry = document.createElement("article");
-    entry.className = `message ${message.type === "system" ? "system" : ""}`;
+    entry.className = `message ${message.type === "system" ? "system" : ""} ${message.type === "direct" ? "direct" : ""}`;
 
     if (message.type === "system") {
       entry.textContent = `${message.time || ""} ${message.message || ""}`;
@@ -125,7 +135,12 @@
 
       const user = document.createElement("span");
       user.className = "message-user";
-      user.textContent = message.username || "Unbekannt";
+      if (message.type === "direct") {
+        const direction = currentUsername && message.username === currentUsername ? `an ${message.to || "?"}` : `von ${message.username || "Unbekannt"}`;
+        user.textContent = `Direkt ${direction}`;
+      } else {
+        user.textContent = message.username || "Unbekannt";
+      }
 
       const time = document.createElement("span");
       time.className = "message-time";
@@ -146,12 +161,36 @@
   function renderUsers(users) {
     usersEl.textContent = "";
     userCountEl.textContent = String(users.length);
+    const currentTarget = directTargetEl ? directTargetEl.value : "";
 
     users.forEach(function (name) {
       const item = document.createElement("li");
       item.textContent = name;
       usersEl.appendChild(item);
     });
+
+    if (!directTargetEl) {
+      return;
+    }
+    directTargetEl.textContent = "";
+    const allOption = document.createElement("option");
+    allOption.value = "";
+    allOption.textContent = "Alle (oeffentlicher Chat)";
+    directTargetEl.appendChild(allOption);
+
+    users
+      .filter(function (name) { return name !== currentUsername; })
+      .forEach(function (name) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = `Direkt an ${name}`;
+        directTargetEl.appendChild(option);
+      });
+
+    const stillAvailable = Array.from(directTargetEl.options).some(function (option) {
+      return option.value === currentTarget;
+    });
+    directTargetEl.value = stillAvailable ? currentTarget : "";
   }
 
   function setStatus(state, label) {

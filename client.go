@@ -29,6 +29,7 @@ type Client struct {
 
 type inboundMessage struct {
 	Message string `json:"message"`
+	To      string `json:"to,omitempty"`
 }
 
 // readPump consumes websocket frames, validates payloads and forwards chat messages to the hub.
@@ -62,6 +63,12 @@ func (c *Client) readPump() {
 
 		text := sanitizeMessage(inbound.Message)
 		if text == "" {
+			continue
+		}
+
+		recipient := sanitizeUsername(inbound.To)
+		if recipient != "" {
+			c.hub.SendDirectMessage(c.username, recipient, text)
 			continue
 		}
 

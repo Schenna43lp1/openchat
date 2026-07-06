@@ -89,6 +89,11 @@
   text-align: center;
 }
 
+.message.direct {
+  border-color: rgba(88, 214, 141, 0.45);
+  background: rgba(88, 214, 141, 0.08);
+}
+
 .message-meta {
   display: flex;
   align-items: baseline;
@@ -120,6 +125,16 @@
   padding: 0.75rem;
   border-top: 1px solid var(--line);
   background: var(--panel-strong);
+}
+
+.composer-fields {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.composer-fields select {
+  height: 2.4rem;
+  padding: 0 0.65rem;
 }
 
 textarea {

@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -13,6 +14,7 @@ type EventType string
 
 const (
 	EventMessage EventType = "message"
+	EventDirect  EventType = "direct"
 	EventSystem  EventType = "system"
 	EventUsers   EventType = "users"
 	EventHistory EventType = "history"
@@ -21,6 +23,7 @@ const (
 type ChatEvent struct {
 	Type      EventType `json:"type"`
 	Username  string    `json:"username,omitempty"`
+	To        string    `json:"to,omitempty"`
 	Message   string    `json:"message,omitempty"`
 	Time      string    `json:"time,omitempty"`
 	Users     []string  `json:"users,omitempty"`
@@ -31,15 +34,23 @@ type ChatEvent struct {
 type Message struct {
 	Type      EventType `json:"type"`
 	Username  string    `json:"username,omitempty"`
+	To        string    `json:"to,omitempty"`
 	Message   string    `json:"message"`
 	Time      string    `json:"time"`
 	Timestamp int64     `json:"timestamp"`
+}
+
+type directMessage struct {
+	From string
+	To   string
+	Text string
 }
 
 type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 	broadcast  chan Message
+	direct     chan directMessage
 	done       chan struct{}
 
 	clients map[*Client]bool
@@ -55,6 +66,7 @@ func NewHub(logger *log.Logger) *Hub {
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		broadcast:  make(chan Message, 256),
+		direct:     make(chan directMessage, 256),
 		done:       make(chan struct{}),
 		clients:    make(map[*Client]bool),
 		logger:     logger,
@@ -88,17 +100,38 @@ func (h *Hub) Run() {
 			h.sendAll(ChatEvent{
 				Type:      message.Type,
 				Username:  message.Username,
+				To:        message.To,
 				Message:   message.Message,
 				Time:      message.Time,
 				Timestamp: message.Timestamp,
 			})
+
+		case message := <-h.direct:
+			recipient := strings.TrimSpace(message.To)
+			if recipient == "" {
+				continue
+			}
+
+			direct := newMessage(EventDirect, message.From, message.Text)
+			direct.To = recipient
+			delivered := h.sendDirect(direct)
+			if !delivered {
+				h.sendToUsername(message.From, ChatEvent{
+					Type:      EventSystem,
+					Message:   "Direktnachricht konnte nicht zugestellt werden (Benutzer offline).",
+					Time:      direct.Time,
+					Timestamp: direct.Timestamp,
+				})
+			}
 
 		case <-h.done:
 			h.logger.Println("hub shutting down")
 			for client := range h.clients {
 				delete(h.clients, client)
 				close(client.send)
-				_ = client.conn.Close()
+				if client.conn != nil {
+					_ = client.conn.Close()
+				}
 			}
 			return
 		}
@@ -115,6 +148,11 @@ func (h *Hub) Close() {
 // BroadcastMessage submits a user message to the hub event loop.
 func (h *Hub) BroadcastMessage(username, text string) {
 	h.broadcast <- newMessage(EventMessage, username, text)
+}
+
+// SendDirectMessage queues a direct message from sender to recipient.
+func (h *Hub) SendDirectMessage(from, to, text string) {
+	h.direct <- directMessage{From: from, To: to, Text: text}
 }
 
 // broadcastSystem emits system messages (join/leave) to all clients.
@@ -147,9 +185,56 @@ func (h *Hub) sendAll(event ChatEvent) {
 		default:
 			delete(h.clients, client)
 			close(client.send)
-			_ = client.conn.Close()
+			if client.conn != nil {
+				_ = client.conn.Close()
+			}
 			h.logger.Printf("dropped slow client: %s", client.username)
 		}
+	}
+}
+
+func (h *Hub) sendDirect(message Message) bool {
+	event := ChatEvent{
+		Type:      EventDirect,
+		Username:  message.Username,
+		To:        message.To,
+		Message:   message.Message,
+		Time:      message.Time,
+		Timestamp: message.Timestamp,
+	}
+
+	recipientDelivered := false
+	for client := range h.clients {
+		if strings.EqualFold(client.username, message.Username) {
+			h.sendOne(client, event)
+			continue
+		}
+		if strings.EqualFold(client.username, message.To) {
+			recipientDelivered = true
+			h.sendOne(client, event)
+		}
+	}
+	return recipientDelivered
+}
+
+func (h *Hub) sendToUsername(username string, event ChatEvent) {
+	for client := range h.clients {
+		if strings.EqualFold(client.username, username) {
+			h.sendOne(client, event)
+		}
+	}
+}
+
+func (h *Hub) sendOne(client *Client, event ChatEvent) {
+	select {
+	case client.send <- event:
+	default:
+		delete(h.clients, client)
+		close(client.send)
+		if client.conn != nil {
+			_ = client.conn.Close()
+		}
+		h.logger.Printf("dropped slow client: %s", client.username)
 	}
 }
 

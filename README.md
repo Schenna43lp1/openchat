@@ -9,6 +9,7 @@ Ein leichtgewichtiges Echtzeit-Chat-System mit:
 - Gorilla WebSocket (Live-Nachrichten)
 - responsivem Frontend (Chat, Login, Admin-Bereich)
 - JSON **oder** SQLite als User-Storage
+- öffentlichen Nachrichten und Direktnachrichten
 
 ## Schnellstart
 
@@ -64,6 +65,15 @@ Regeln:
 
 - letzter aktiver Admin kann nicht entfernt/gesperrt werden
 - gesperrte Nutzer können sich nicht anmelden
+
+## Direktnachrichten
+
+Im Chat-Composer kannst du den Empfänger wählen:
+
+- `Alle (öffentlicher Chat)` für normale Nachrichten
+- `Direkt an <Benutzer>` für private Nachricht
+
+Direktnachrichten werden nur an Sender und Empfänger zugestellt.
 
 ## Endpunkte
 

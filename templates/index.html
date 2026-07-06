@@ -35,8 +35,13 @@
       <div class="messages" id="messages" aria-live="polite"></div>
 
       <form class="composer" id="messageForm">
-        <textarea id="messageInput" rows="1" maxlength="4096" placeholder="Nachricht schreiben..."
-          autocomplete="off"></textarea>
+        <div class="composer-fields">
+          <select id="directTarget" aria-label="Direktnachricht an">
+            <option value="">Alle (oeffentlicher Chat)</option>
+          </select>
+          <textarea id="messageInput" rows="1" maxlength="4096" placeholder="Nachricht schreiben..."
+            autocomplete="off"></textarea>
+        </div>
         <button type="submit">Senden</button>
       </form>
     </section>
