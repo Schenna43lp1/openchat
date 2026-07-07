@@ -11,6 +11,7 @@
   const splashEl = document.getElementById("splashScreen");
   const currentUserEl = document.getElementById("currentUser");
   const currentUsername = currentUserEl ? currentUserEl.textContent.trim() : "";
+  const chatScope = document.body.dataset.chatScope || "public";
 
   let socket = null;
   let reconnectTimer = null;
@@ -94,6 +95,10 @@
     }
 
     const recipient = directTargetEl ? directTargetEl.value.trim() : "";
+    if (directTargetEl && recipient === "") {
+      directTargetEl.focus();
+      return;
+    }
     const payload = { message: text };
     if (recipient !== "") {
       payload.to = recipient;
@@ -108,12 +113,14 @@
     switch (payload.type) {
       case "history":
         messagesEl.textContent = "";
-        (payload.messages || []).forEach(addMessage);
+        (payload.messages || []).filter(shouldRenderMessage).forEach(addMessage);
         break;
       case "message":
       case "direct":
       case "system":
-        addMessage(payload);
+        if (shouldRenderMessage(payload)) {
+          addMessage(payload);
+        }
         break;
       case "users":
         renderUsers(payload.users || []);
@@ -121,6 +128,16 @@
       default:
         break;
     }
+  }
+
+  function shouldRenderMessage(message) {
+    if (!message) {
+      return false;
+    }
+    if (chatScope === "direct") {
+      return message.type === "direct" || message.type === "system";
+    }
+    return message.type === "message" || message.type === "system";
   }
 
   function addMessage(message) {
@@ -175,7 +192,7 @@
     directTargetEl.textContent = "";
     const allOption = document.createElement("option");
     allOption.value = "";
-    allOption.textContent = "Alle (oeffentlicher Chat)";
+    allOption.textContent = chatScope === "direct" ? "Empfaenger auswaehlen" : "Alle (oeffentlicher Chat)";
     directTargetEl.appendChild(allOption);
 
     users

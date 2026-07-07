@@ -24,6 +24,11 @@ func main() {
 		logger.Fatalf("parse template: %v", err)
 	}
 
+	directTmpl, err := template.ParseFiles("templates/direct.html")
+	if err != nil {
+		logger.Fatalf("parse direct template: %v", err)
+	}
+
 	loginTmpl, err := template.ParseFiles("templates/login.html")
 	if err != nil {
 		logger.Fatalf("parse login template: %v", err)
@@ -52,6 +57,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", authRequired(sessions, users, indexHandler(tmpl, logger)))
+	mux.Handle("/direct", authRequired(sessions, users, directHandler(directTmpl, logger)))
 	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, logger)))
 	mux.Handle("/admin/users", authRequired(sessions, users, staffRequired(adminUsersHandler(adminTmpl, users, logger))))
 	mux.HandleFunc("/login", loginHandler(loginTmpl, users, sessions, logger))
@@ -82,8 +88,17 @@ type indexViewData struct {
 
 // indexHandler renders the chat UI for authenticated users.
 func indexHandler(tmpl *template.Template, logger *log.Logger) http.Handler {
+	return chatPageHandler("/", tmpl, logger)
+}
+
+// directHandler renders the direct message UI for authenticated users.
+func directHandler(tmpl *template.Template, logger *log.Logger) http.Handler {
+	return chatPageHandler("/direct", tmpl, logger)
+}
+
+func chatPageHandler(path string, tmpl *template.Template, logger *log.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
+		if r.URL.Path != path {
 			http.NotFound(w, r)
 			return
 		}

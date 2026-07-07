@@ -108,3 +108,11 @@ select:focus {
 .text-link:hover {
   color: var(--accent-strong);
 }
+
+footer {
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}

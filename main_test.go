@@ -1,6 +1,13 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"html/template"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 // By default the application should keep using the legacy JSON location.
 func TestResolveUsersStorePathDefault(t *testing.T) {
@@ -15,5 +22,34 @@ func TestResolveUsersStorePathFromEnv(t *testing.T) {
 	t.Setenv("OPENCHAT_USERS_FILE", "data/users.sqlite")
 	if got := resolveUsersStorePath(); got != "data/users.sqlite" {
 		t.Fatalf("resolveUsersStorePath() = %q, want %q", got, "data/users.sqlite")
+	}
+}
+
+func TestDirectHandlerRendersTemplate(t *testing.T) {
+	tmpl, err := template.ParseFiles("templates/direct.html")
+	if err != nil {
+		t.Fatalf("parse direct template: %v", err)
+	}
+
+	handler := directHandler(tmpl, testLogger(t))
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/direct", nil)
+	req = req.WithContext(context.WithValue(req.Context(), currentUserContextKey, currentUser{
+		Username: "alice",
+		Role:     RoleUser,
+	}))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Direkt-Chat") {
+		t.Fatal("expected direct chat heading in response body")
+	}
+	if !strings.Contains(body, "data-chat-scope=\"direct\"") {
+		t.Fatal("expected direct chat scope marker in response body")
 	}
 }
