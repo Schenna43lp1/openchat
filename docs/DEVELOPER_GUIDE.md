@@ -136,6 +136,20 @@ sequenceDiagram
     H-->>B: message/system/users/history Events
 ```
 
+## 6.1 Direktnachrichten-Flow
+
+```mermaid
+sequenceDiagram
+    participant S as Sender
+    participant H as Hub
+    participant R as Empfänger
+
+    S->>H: {message, to}
+    H->>H: EventDirect erzeugen
+    H-->>S: direct event
+    H-->>R: direct event
+```
+
 ---
 
 ## 7. Admin-/Moderator-Flow (Ban/Role)

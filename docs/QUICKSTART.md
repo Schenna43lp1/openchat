@@ -30,6 +30,7 @@ docker run -d --name openchat -p 8080:8080 ghcr.io/schenna43lp1/openchat:latest
 ## 3) Chat verwenden
 
 - Nachricht schreiben und senden
+- Für private Nachricht im Dropdown `Direkt an <Benutzer>` wählen
 - Online-Liste rechts sehen
 - Logout über den Button im Account-Bereich
 
