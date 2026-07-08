@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Direkt-Chat | Open chat</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body data-chat-scope="direct">
+    <main class="app-shell">
+        <section class="chat-panel" aria-label="Direkt-Chat">
+            <header class="chat-header">
+                <div class="chat-header-main">
+                    <h1>Direkt-Chat</h1>
+                    <p class="signed-in">Angemeldet als <strong id="currentUser">{{.Username}}</strong> <span
+                            class="role-badge">{{.Role}}</span></p>
+                    <nav class="top-nav" aria-label="Hauptnavigation">
+                        <a class="top-nav__link" href="/">Chat</a>
+                        <a class="top-nav__link is-active" href="/direct" aria-current="page">Direkt-Chat</a>
+                        {{if .CanManageUsers}}
+                        <a class="top-nav__link" href="/admin/users">Admin</a>
+                        {{end}}
+                    </nav>
+                </div>
+                <div class="chat-header-meta">
+                    <div class="connection" id="connectionStatus" data-state="offline">
+                        <span class="status-dot"></span>
+                        <span id="connectionText">Offline</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="messages" id="messages" aria-live="polite"></div>
+
+            <form class="composer" id="messageForm">
+                <div class="composer-fields">
+                    <select id="directTarget" aria-label="Direktnachricht an">
+                        <option value="">Empfaenger auswaehlen</option>
+                    </select>
+                    <textarea id="messageInput" rows="1" maxlength="4096" placeholder="Direktnachricht schreiben..."
+                        autocomplete="off"></textarea>
+                </div>
+                <button type="submit">Senden</button>
+            </form>
+        </section>
+
+        <aside class="sidebar" aria-label="Benutzer">
+            <div class="account-card">
+                <h2>Account</h2>
+                <p>{{.Username}} <span class="role-badge">{{.Role}}</span></p>
+                <a class="account-link" href="/">Zum oeffentlichen Chat</a>
+                {{if .CanManageUsers}}
+                <a class="account-link" href="/admin/users">Benutzer verwalten</a>
+                {{end}}
+                <form method="post" action="/logout">
+                    <button type="submit" class="button-secondary">Logout</button>
+                </form>
+            </div>
+
+            <div class="users-panel">
+                <div class="users-heading">
+                    <h2>Online</h2>
+                    <span id="userCount">0</span>
+                </div>
+                <ul id="users"></ul>
+            </div>
+        </aside>
+    </main>
+
+    <script src="/static/app.js"></script>
+    <footer>
+        <p>Open chat &copy; 2026</p>
+        <p>Made with ❤️ by <a href="https://markusstuefer.com">Markus Stuefer</a></p>
+    </footer>
+</body>
+
+</html>

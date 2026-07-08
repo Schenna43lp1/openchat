@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 
-<body>
+<body data-chat-scope="public">
   <!-- Initial loading overlay, hidden by static/app.js after socket is ready. -->
   <div class="splash-screen" id="splashScreen" role="status" aria-live="polite">
     <div class="splash-card">
@@ -21,14 +21,23 @@
   <main class="app-shell">
     <section class="chat-panel" aria-label="Chat">
       <header class="chat-header">
-        <div>
+        <div class="chat-header-main">
           <h1>Open chat</h1>
           <p class="signed-in">Angemeldet als <strong id="currentUser">{{.Username}}</strong> <span
               class="role-badge">{{.Role}}</span></p>
+          <nav class="top-nav" aria-label="Hauptnavigation">
+            <a class="top-nav__link is-active" href="/" aria-current="page">Chat</a>
+            <a class="top-nav__link" href="/direct">Direkt-Chat</a>
+            {{if .CanManageUsers}}
+            <a class="top-nav__link" href="/admin/users">Admin</a>
+            {{end}}
+          </nav>
         </div>
-        <div class="connection" id="connectionStatus" data-state="offline">
-          <span class="status-dot"></span>
-          <span id="connectionText">Offline</span>
+        <div class="chat-header-meta">
+          <div class="connection" id="connectionStatus" data-state="offline">
+            <span class="status-dot"></span>
+            <span id="connectionText">Offline</span>
+          </div>
         </div>
       </header>
 
@@ -36,11 +45,8 @@
 
       <form class="composer" id="messageForm">
         <div class="composer-fields">
-          <select id="directTarget" aria-label="Direktnachricht an">
-            <option value="">Alle (oeffentlicher Chat)</option>
-          </select>
-          <textarea id="messageInput" rows="1" maxlength="4096" placeholder="Nachricht schreiben..."
-            autocomplete="off"></textarea>
+          <textarea id="messageInput" rows="1" maxlength="4096"
+            placeholder="Nachricht an den oeffentlichen Chat schreiben..." autocomplete="off"></textarea>
         </div>
         <button type="submit">Senden</button>
       </form>
@@ -50,6 +56,7 @@
       <div class="account-card">
         <h2>Account</h2>
         <p>{{.Username}} <span class="role-badge">{{.Role}}</span></p>
+        <a class="account-link" href="/direct">Zum Direkt-Chat</a>
         {{if .CanManageUsers}}
         <a class="account-link" href="/admin/users">Benutzer verwalten</a>
         {{end}}
