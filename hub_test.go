@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"log"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -55,6 +58,30 @@ func TestDirectMessageToOfflineUserSendsSystemNotice(t *testing.T) {
 	event := waitForEventType(t, alice.send, EventSystem)
 	if event.Message == "" {
 		t.Fatal("expected system notice for failed direct delivery")
+	}
+}
+
+func TestChatHistoryIsPersistedToDisk(t *testing.T) {
+	historyPath := filepath.Join(t.TempDir(), "chat-history.json")
+	hub := NewHubWithHistoryPath(log.New(io.Discard, "", 0), historyPath)
+	hub.addToHistory(Message{Type: EventMessage, Username: "alice", Message: "hello", Time: "10:00:00", Timestamp: 1})
+	hub.addToHistory(Message{Type: EventDirect, Username: "alice", To: "bob", Message: "secret", Time: "10:01:00", Timestamp: 2})
+	hub.saveHistory()
+
+	raw, err := os.ReadFile(historyPath)
+	if err != nil {
+		t.Fatalf("read persisted history: %v", err)
+	}
+
+	var history []Message
+	if err := json.Unmarshal(raw, &history); err != nil {
+		t.Fatalf("decode persisted history: %v", err)
+	}
+	if len(history) != 2 {
+		t.Fatalf("persisted history length = %d, want %d", len(history), 2)
+	}
+	if history[0].Message != "hello" || history[1].Type != EventDirect {
+		t.Fatalf("persisted history mismatch: %+v", history)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -22,6 +23,20 @@ func TestResolveUsersStorePathFromEnv(t *testing.T) {
 	t.Setenv("OPENCHAT_USERS_FILE", "data/users.sqlite")
 	if got := resolveUsersStorePath(); got != "data/users.sqlite" {
 		t.Fatalf("resolveUsersStorePath() = %q, want %q", got, "data/users.sqlite")
+	}
+}
+
+func TestResolveChatHistoryPathDefault(t *testing.T) {
+	t.Setenv("OPENCHAT_CHAT_HISTORY_FILE", "")
+	if got := resolveChatHistoryPath(); got != filepath.Join("data", "chat-history.json") {
+		t.Fatalf("resolveChatHistoryPath() = %q, want %q", got, filepath.Join("data", "chat-history.json"))
+	}
+}
+
+func TestResolveChatHistoryPathFromEnv(t *testing.T) {
+	t.Setenv("OPENCHAT_CHAT_HISTORY_FILE", "logs/chat.json")
+	if got := resolveChatHistoryPath(); got != "logs/chat.json" {
+		t.Fatalf("resolveChatHistoryPath() = %q, want %q", got, "logs/chat.json")
 	}
 }
 

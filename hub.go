@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -53,24 +56,33 @@ type Hub struct {
 	direct     chan directMessage
 	done       chan struct{}
 
-	clients map[*Client]bool
-	history []Message
-	logger  *log.Logger
+	clients     map[*Client]bool
+	history     []Message
+	historyPath string
+	logger      *log.Logger
 
 	closeOnce sync.Once
 }
 
 // NewHub creates the central chat event broker.
 func NewHub(logger *log.Logger) *Hub {
-	return &Hub{
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		broadcast:  make(chan Message, 256),
-		direct:     make(chan directMessage, 256),
-		done:       make(chan struct{}),
-		clients:    make(map[*Client]bool),
-		logger:     logger,
+	return NewHubWithHistoryPath(logger, resolveChatHistoryPath())
+}
+
+// NewHubWithHistoryPath creates the hub and loads persisted chat history from disk.
+func NewHubWithHistoryPath(logger *log.Logger, historyPath string) *Hub {
+	hub := &Hub{
+		register:    make(chan *Client),
+		unregister:  make(chan *Client),
+		broadcast:   make(chan Message, 256),
+		direct:      make(chan directMessage, 256),
+		done:        make(chan struct{}),
+		clients:     make(map[*Client]bool),
+		historyPath: historyPath,
+		logger:      logger,
 	}
+	hub.loadHistory()
+	return hub
 }
 
 // Run processes register/unregister/broadcast events in a single goroutine.
@@ -97,6 +109,7 @@ func (h *Hub) Run() {
 		case message := <-h.broadcast:
 			// Chat messages are persisted in in-memory history and fanned out to all clients.
 			h.addToHistory(message)
+			h.saveHistory()
 			h.sendAll(ChatEvent{
 				Type:      message.Type,
 				Username:  message.Username,
@@ -114,6 +127,8 @@ func (h *Hub) Run() {
 
 			direct := newMessage(EventDirect, message.From, message.Text)
 			direct.To = recipient
+			h.addToHistory(direct)
+			h.saveHistory()
 			delivered := h.sendDirect(direct)
 			if !delivered {
 				h.sendToUsername(message.From, ChatEvent{
@@ -244,6 +259,53 @@ func (h *Hub) addToHistory(message Message) {
 	if len(h.history) > messageHistoryLimit {
 		h.history = h.history[len(h.history)-messageHistoryLimit:]
 	}
+}
+
+func (h *Hub) loadHistory() {
+	if h.historyPath == "" {
+		return
+	}
+	raw, err := os.ReadFile(h.historyPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			h.logger.Printf("load chat history: %v", err)
+		}
+		return
+	}
+	var history []Message
+	if err := json.Unmarshal(raw, &history); err != nil {
+		h.logger.Printf("decode chat history: %v", err)
+		return
+	}
+	if len(history) > messageHistoryLimit {
+		history = history[len(history)-messageHistoryLimit:]
+	}
+	h.history = history
+}
+
+func (h *Hub) saveHistory() {
+	if h.historyPath == "" {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(h.historyPath), 0o755); err != nil {
+		h.logger.Printf("create chat history dir: %v", err)
+		return
+	}
+	raw, err := json.MarshalIndent(h.history, "", "  ")
+	if err != nil {
+		h.logger.Printf("encode chat history: %v", err)
+		return
+	}
+	if err := os.WriteFile(h.historyPath, raw, 0o644); err != nil {
+		h.logger.Printf("save chat history: %v", err)
+	}
+}
+
+func resolveChatHistoryPath() string {
+	if path := os.Getenv("OPENCHAT_CHAT_HISTORY_FILE"); path != "" {
+		return path
+	}
+	return filepath.Join("data", "chat-history.json")
 }
 
 func newMessage(eventType EventType, username, text string) Message {

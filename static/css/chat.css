@@ -27,15 +27,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.9rem 1rem;
+  gap: 1.25rem;
+  padding: 1rem 1.1rem;
   border-bottom: 1px solid var(--line);
   background: var(--panel-strong);
 }
 
 .chat-header-main {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.7rem;
 }
 
 .chat-header-meta {
@@ -80,34 +80,38 @@
 .top-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .top-nav__link {
   display: inline-flex;
   align-items: center;
-  min-height: 2.25rem;
-  padding: 0 0.8rem;
-  border: 1px solid var(--line);
+  min-height: 2.45rem;
+  padding: 0 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.02);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
   color: var(--muted);
   font-weight: 700;
   text-decoration: none;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  transition: transform 160ms ease, border-color 160ms ease, color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .top-nav__link:hover {
-  border-color: rgba(52, 211, 153, 0.45);
+  transform: translateY(-1px);
+  border-color: rgba(52, 211, 153, 0.5);
   color: var(--text);
-  background: rgba(52, 211, 153, 0.08);
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.14), rgba(52, 211, 153, 0.08));
+  box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.18);
 }
 
 .top-nav__link.is-active,
 .top-nav__link[aria-current="page"] {
-  border-color: rgba(52, 211, 153, 0.45);
-  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.56);
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.2), rgba(52, 211, 153, 0.12));
   color: var(--accent);
+  box-shadow: 0 0.45rem 1.2rem rgba(52, 211, 153, 0.08);
 }
 
 .messages {
