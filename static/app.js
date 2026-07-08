@@ -9,15 +9,22 @@
   const connectionEl = document.getElementById("connectionStatus");
   const connectionTextEl = document.getElementById("connectionText");
   const splashEl = document.getElementById("splashScreen");
+  const notificationToggleEl = document.getElementById("notificationToggle");
+  const notificationLabelEl = document.getElementById("notificationLabel");
+  const notificationCountEl = document.getElementById("notificationCount");
+  const toastStackEl = document.getElementById("toastStack");
   const currentUserEl = document.getElementById("currentUser");
   const currentUsername = currentUserEl ? currentUserEl.textContent.trim() : "";
   const chatScope = document.body.dataset.chatScope || "public";
+  const notificationsStorageKey = "openchat.notifications.enabled";
 
   let socket = null;
   let reconnectTimer = null;
   let reconnectDelay = 800;
   let manuallyClosed = false;
   let splashHidden = false;
+  let notificationsEnabled = false;
+  let unreadCount = 0;
   const splashStartedAt = Date.now();
 
   formEl.addEventListener("submit", function (event) {
@@ -34,6 +41,17 @@
 
   inputEl.addEventListener("input", resizeComposer);
 
+  if (notificationToggleEl) {
+    notificationToggleEl.addEventListener("click", toggleNotifications);
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+      unreadCount = 0;
+      updateNotificationCount();
+    }
+  });
+
   window.addEventListener("beforeunload", function () {
     manuallyClosed = true;
     if (socket) {
@@ -42,6 +60,7 @@
   });
 
   setTimeout(hideSplash, 1800);
+  initNotifications();
   connect();
 
   function connect() {
@@ -121,6 +140,7 @@
         if (shouldRenderMessage(payload)) {
           addMessage(payload);
         }
+        handleIncomingNotification(payload);
         break;
       case "users":
         renderUsers(payload.users || []);
@@ -173,6 +193,162 @@
 
     messagesEl.appendChild(entry);
     messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function initNotifications() {
+    if (!notificationToggleEl) {
+      return;
+    }
+    const persisted = window.localStorage.getItem(notificationsStorageKey);
+    if (persisted === "1" && hasNotificationPermission()) {
+      notificationsEnabled = true;
+    }
+    updateNotificationToggle();
+    updateNotificationCount();
+  }
+
+  function toggleNotifications() {
+    if (!notificationToggleEl) {
+      return;
+    }
+    if (notificationsEnabled) {
+      notificationsEnabled = false;
+      window.localStorage.setItem(notificationsStorageKey, "0");
+      updateNotificationToggle();
+      showToast("Benachrichtigungen", "Browser-Benachrichtigungen deaktiviert.");
+      return;
+    }
+
+    if (!("Notification" in window)) {
+      showToast("Benachrichtigungen", "Dieser Browser unterstuetzt keine Benachrichtigungen.");
+      return;
+    }
+
+    Notification.requestPermission().then(function (permission) {
+      if (permission === "granted") {
+        notificationsEnabled = true;
+        window.localStorage.setItem(notificationsStorageKey, "1");
+        updateNotificationToggle();
+        showToast("Benachrichtigungen", "Browser-Benachrichtigungen aktiviert.");
+        return;
+      }
+      showToast("Benachrichtigungen", "Berechtigung wurde nicht erteilt.");
+    });
+  }
+
+  function updateNotificationToggle() {
+    if (!notificationToggleEl) {
+      return;
+    }
+    notificationToggleEl.classList.toggle("is-on", notificationsEnabled);
+    notificationToggleEl.setAttribute("aria-pressed", notificationsEnabled ? "true" : "false");
+    if (notificationLabelEl) {
+      notificationLabelEl.textContent = notificationsEnabled ? "Benachrichtigungen an" : "Benachrichtigungen aus";
+    }
+  }
+
+  function updateNotificationCount() {
+    if (!notificationCountEl) {
+      return;
+    }
+    if (unreadCount <= 0) {
+      notificationCountEl.hidden = true;
+      notificationCountEl.textContent = "0";
+      return;
+    }
+    notificationCountEl.hidden = false;
+    notificationCountEl.textContent = String(unreadCount);
+  }
+
+  function hasNotificationPermission() {
+    return typeof Notification !== "undefined" && Notification.permission === "granted";
+  }
+
+  function handleIncomingNotification(payload) {
+    if (!payload || !shouldNotify(payload)) {
+      return;
+    }
+
+    if (document.hidden) {
+      unreadCount += 1;
+      updateNotificationCount();
+    }
+
+    showToast(notificationTitle(payload), payload.message || "Neue Aktivitaet");
+
+    if (notificationsEnabled && hasNotificationPermission()) {
+      const browserNotification = new Notification(notificationTitle(payload), {
+        body: payload.message || "Neue Aktivitaet",
+        tag: `openchat-${payload.type || "event"}`,
+      });
+      browserNotification.onclick = function () {
+        window.focus();
+        browserNotification.close();
+      };
+    }
+  }
+
+  function shouldNotify(payload) {
+    if (!payload.message) {
+      return false;
+    }
+
+    if (payload.type === "direct") {
+      return payload.username !== currentUsername;
+    }
+
+    if (payload.type === "message") {
+      return chatScope === "public" && payload.username !== currentUsername && document.hidden;
+    }
+
+    if (payload.type === "system") {
+      return document.hidden;
+    }
+
+    return false;
+  }
+
+  function notificationTitle(payload) {
+    if (payload.type === "direct") {
+      return `Direktnachricht von ${payload.username || "Unbekannt"}`;
+    }
+    if (payload.type === "message") {
+      return `Neue Nachricht von ${payload.username || "Unbekannt"}`;
+    }
+    return "Open chat Hinweis";
+  }
+
+  function showToast(title, message) {
+    if (!toastStackEl) {
+      return;
+    }
+
+    const toast = document.createElement("article");
+    toast.className = "toast";
+
+    const heading = document.createElement("p");
+    heading.className = "toast__title";
+    heading.textContent = title;
+
+    const body = document.createElement("p");
+    body.className = "toast__body";
+    body.textContent = message;
+
+    toast.append(heading, body);
+    toastStackEl.appendChild(toast);
+
+    while (toastStackEl.children.length > 4) {
+      toastStackEl.removeChild(toastStackEl.firstElementChild);
+    }
+
+    setTimeout(function () {
+      toast.classList.add("is-out");
+      setTimeout(function () {
+        if (toast.parentElement) {
+          toast.parentElement.removeChild(toast);
+        }
+      }, 220);
+    }, 3600);
   }
 
   function renderUsers(users) {

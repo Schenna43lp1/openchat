@@ -1,14 +1,16 @@
 :root {
     /* Shared design tokens used by static/style.css. */
     color-scheme: dark;
-    --bg: #101114;
-    --panel: #181a20;
-    --panel-strong: #20232b;
-    --line: #30333d;
-    --text: #f5f5f6;
-    --muted: #a5a8b1;
+    --bg: #0d1118;
+    --panel: #151c27;
+    --panel-strong: #1b2331;
+    --line: #2e3a4c;
+    --text: #edf2fa;
+    --muted: #a1afc4;
     --accent: #58d68d;
     --accent-strong: #45c47c;
     --danger: #fb7185;
-    --shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
+    --radius: 12px;
+    --radius-soft: 9px;
 }
