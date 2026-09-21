@@ -3,12 +3,19 @@ package main
 import (
 	"context"
 	"html/template"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func testLogger(t *testing.T) *log.Logger {
+	t.Helper()
+	return log.New(io.Discard, "", 0)
+}
 
 // By default the application should keep using the legacy JSON location.
 func TestResolveUsersStorePathDefault(t *testing.T) {
