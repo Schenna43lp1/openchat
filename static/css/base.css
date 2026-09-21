@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap");
+
 /* Shared base styles and reusable UI elements. */
 * {
   box-sizing: border-box;
@@ -6,8 +8,11 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--bg);
+  font-family: Manrope, "Segoe UI", "Helvetica Neue", sans-serif;
+  background:
+    radial-gradient(75rem 45rem at 110% -10%, rgba(88, 214, 141, 0.08), transparent 60%),
+    radial-gradient(65rem 38rem at -15% 100%, rgba(94, 165, 255, 0.12), transparent 60%),
+    var(--bg);
   color: var(--text);
 }
 
@@ -20,16 +25,17 @@ textarea {
 
 button {
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-soft);
   background: var(--accent);
   color: #04110c;
   cursor: pointer;
-  font-weight: 700;
-  transition: transform 160ms ease, background 160ms ease;
+  font-weight: 800;
+  transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 button:hover {
   background: var(--accent-strong);
+  box-shadow: 0 0.45rem 1rem rgba(69, 196, 124, 0.2);
 }
 
 button:active {
@@ -49,15 +55,18 @@ button:active {
 h1,
 h2 {
   margin: 0;
-  letter-spacing: 0;
+  letter-spacing: 0.01em;
+  font-family: "Space Grotesk", Manrope, sans-serif;
 }
 
 h1 {
-  font-size: 1.35rem;
+  font-size: 1.45rem;
+  font-weight: 700;
 }
 
 h2 {
   font-size: 1rem;
+  font-weight: 700;
 }
 
 .role-badge {
@@ -79,8 +88,8 @@ input,
 select {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #101217;
+  border-radius: var(--radius-soft);
+  background: #111825;
   color: var(--text);
   outline: none;
 }
@@ -100,7 +109,7 @@ select:focus {
 .account-link,
 .text-link {
   color: var(--accent);
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
 }
 
@@ -112,7 +121,9 @@ select:focus {
 footer {
   display: grid;
   place-items: center;
-  padding: 1rem;
-  font-size: 0.75rem;
+  gap: 0.2rem;
+  padding: 1.2rem 1rem;
+  font-size: 0.78rem;
   color: var(--muted);
+  text-align: center;
 }

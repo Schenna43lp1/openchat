@@ -34,6 +34,10 @@
           </nav>
         </div>
         <div class="chat-header-meta">
+          <button type="button" class="notify-toggle" id="notificationToggle" aria-live="polite">
+            <span id="notificationLabel">Benachrichtigungen aus</span>
+            <span class="notify-count" id="notificationCount" hidden>0</span>
+          </button>
           <div class="connection" id="connectionStatus" data-state="offline">
             <span class="status-dot"></span>
             <span id="connectionText">Offline</span>
@@ -76,6 +80,7 @@
   </main>
 
   <script src="/static/app.js"></script>
+  <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
   <footer>
     <p>Open chat &copy; 2026</p>
     <p>Made with ❤️ by <a href="https://markusstuefer.com">Markus Stuefer</a></p>
