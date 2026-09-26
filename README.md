@@ -100,7 +100,7 @@ docker run -d --name openchat-dev -p 8080:8080 ghcr.io/schenna43lp1/openchat:dev
 
 ## CI/CD & Security
 
-- `CI Test`: `.github/workflows/ci-test.yml`
+- `CI Test`: `.github/workflows/CI.yml`
 - `CodeQL`: `.github/workflows/codeql.yml`
 - Docker Build/Publish: `.github/workflows/docker-image.yml`
 - Dependabot: `.github/dependabot.yml`
