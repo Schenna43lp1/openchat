@@ -63,15 +63,18 @@ func (c *Client) readPump() {
 
 		text := sanitizeMessage(inbound.Message)
 		if text == "" {
+			logger.Printf("ignored empty message from %q", c.username)
 			continue
 		}
 
 		recipient := sanitizeUsername(inbound.To)
 		if recipient != "" {
+			logger.Printf("direct message from %q to %q length=%d", c.username, recipient, len(text))
 			c.hub.SendDirectMessage(c.username, recipient, text)
 			continue
 		}
 
+		logger.Printf("broadcast message from %q length=%d", c.username, len(text))
 		c.hub.BroadcastMessage(c.username, text)
 	}
 }

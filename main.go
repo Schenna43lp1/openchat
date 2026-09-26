@@ -2,13 +2,16 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
 )
 
 const (
@@ -16,22 +19,27 @@ const (
 	shutdownTimeout = 10 * time.Second
 )
 
+var logger = log.New(io.Discard, "", 0)
+
 func main() {
-	logger := log.New(os.Stdout, "chat: ", log.LstdFlags|log.Lshortfile)
+	logger = log.New(os.Stdout, "chat: ", log.LstdFlags|log.Lshortfile)
 
 	tmpl, err := template.ParseFiles("templates/index.html")
 	if err != nil {
 		logger.Fatalf("parse template: %v", err)
+		logger.Println("exiting due to template parse error")
 	}
 
 	directTmpl, err := template.ParseFiles("templates/direct.html")
 	if err != nil {
 		logger.Fatalf("parse direct template: %v", err)
+		logger.Println("exiting due to direct template parse error")
 	}
 
 	loginTmpl, err := template.ParseFiles("templates/login.html")
 	if err != nil {
 		logger.Fatalf("parse login template: %v", err)
+		logger.Println("exiting due to login template parse error")
 	}
 
 	adminTmpl, err := template.ParseFiles("templates/admin.html")
@@ -40,10 +48,12 @@ func main() {
 	}
 
 	// User storage backend/path is resolved from env and can point to JSON or SQLite.
+	logger.Printf("loading user store from %s", resolveUsersStorePath())
 	users, err := NewUserStore(resolveUsersStorePath())
 	if err != nil {
 		logger.Fatalf("load users: %v", err)
 	}
+	logger.Printf("user store ready: %s", resolveUsersStorePath())
 	defer func() {
 		if err := users.Close(); err != nil {
 			logger.Printf("close user store: %v", err)
@@ -71,7 +81,7 @@ func main() {
 	}
 
 	go func() {
-		logger.Printf("server listening on http://localhost%s", defaultAddr)
+		logger.Printf("starting http server on http://localhost%s", defaultAddr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatalf("listen and serve: %v", err)
 		}
@@ -96,6 +106,7 @@ func directHandler(tmpl *template.Template, logger *log.Logger) http.Handler {
 	return chatPageHandler("/direct", tmpl, logger)
 }
 
+// chatPageHandler renders the chat page for the given path.
 func chatPageHandler(path string, tmpl *template.Template, logger *log.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != path {
@@ -121,6 +132,7 @@ func chatPageHandler(path string, tmpl *template.Template, logger *log.Logger) h
 	})
 }
 
+// loggingMiddleware logs the HTTP requests with method, path, and duration.
 func loggingMiddleware(logger *log.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -150,12 +162,17 @@ func waitForShutdown(logger *log.Logger, server *http.Server, hub *Hub) {
 	}
 
 	logger.Println("server stopped")
+	logger.Println("shutdown complete")
 }
 
 // resolveUsersStorePath allows overriding the default user storage file by env var.
 func resolveUsersStorePath() string {
 	if path := os.Getenv("OPENCHAT_USERS_FILE"); path != "" {
+		logger.Printf("using custom users store path: %s", path)
 		return path
 	}
+	logger.Printf("using default users store path: %s", usersFile)
 	return usersFile
 }
+
+// resolveUsersStorePath returns the path to the users storage file, allowing override via environment variable.

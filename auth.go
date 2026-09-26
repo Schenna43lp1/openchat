@@ -123,10 +123,13 @@ func NewUserStore(path string) (*UserStore, error) {
 // Register validates credentials, hashes password and persists the new account.
 func (s *UserStore) Register(username, password string) error {
 	username = normalizeAuthUsername(username)
+	logger.Printf("register attempt for username=%q", username)
 	if !validAuthUsername(username) {
+		logger.Printf("registration rejected: invalid username %q", username)
 		return errInvalidUsername
 	}
 	if len(password) < 8 || len(password) > 128 {
+		logger.Printf("registration rejected: invalid password length for %q", username)
 		return errInvalidPassword
 	}
 
@@ -140,6 +143,7 @@ func (s *UserStore) Register(username, password string) error {
 
 	key := strings.ToLower(username)
 	if _, exists := s.users[key]; exists {
+		logger.Printf("registration rejected: username already exists %q", username)
 		return errUsernameTaken
 	}
 
@@ -155,27 +159,37 @@ func (s *UserStore) Register(username, password string) error {
 		CreatedAt:    time.Now().UTC().Format(time.RFC3339),
 	}
 
-	return s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		logger.Printf("save user registration for %q failed: %v", username, err)
+		return err
+	}
+	logger.Printf("registered new user=%q role=%q", username, role)
+	return nil
 }
 
 // Authenticate validates password and blocks banned accounts from logging in.
 func (s *UserStore) Authenticate(username, password string) (authUser, error) {
 	username = normalizeAuthUsername(username)
+	logger.Printf("authentication attempt for username=%q", username)
 
 	s.mu.RLock()
 	user, ok := s.users[strings.ToLower(username)]
 	s.mu.RUnlock()
 	if !ok {
+		logger.Printf("authentication failed: unknown user %q", username)
 		return authUser{}, errInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		logger.Printf("authentication failed: wrong password for %q", username)
 		return authUser{}, errInvalidCredentials
 	}
 	if user.Banned {
+		logger.Printf("authentication blocked: banned user %q", username)
 		return authUser{}, errUserBanned
 	}
 
+	logger.Printf("authentication successful for user=%q role=%q", user.Username, user.Role)
 	return user, nil
 }
 
@@ -205,6 +219,7 @@ func (s *UserStore) List() []authUser {
 // SetRole updates a user's role while protecting the last active admin.
 func (s *UserStore) SetRole(username string, role UserRole) error {
 	if !validRole(role) {
+		logger.Printf("set role rejected: invalid role %q for user %q", role, username)
 		return errInvalidRole
 	}
 
@@ -218,12 +233,19 @@ func (s *UserStore) SetRole(username string, role UserRole) error {
 	}
 
 	if user.Role == RoleAdmin && !user.Banned && role != RoleAdmin && s.activeAdminCountLocked() <= 1 {
+		logger.Printf("role change blocked: last active admin %q cannot be demoted", username)
 		return errLastAdmin
 	}
 
+	oldRole := user.Role
 	user.Role = role
 	s.users[key] = user
-	return s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		logger.Printf("save role change for %q to %q failed: %v", username, role, err)
+		return err
+	}
+	logger.Printf("role changed for user=%q from=%q to=%q", username, oldRole, role)
+	return nil
 }
 
 // SetBanned toggles account ban status while preserving at least one active admin.
@@ -234,16 +256,24 @@ func (s *UserStore) SetBanned(username string, banned bool) error {
 	key := strings.ToLower(normalizeAuthUsername(username))
 	user, ok := s.users[key]
 	if !ok {
+		logger.Printf("ban change rejected: unknown user %q", username)
 		return errUnknownUser
 	}
 
 	if user.Role == RoleAdmin && !user.Banned && banned && s.activeAdminCountLocked() <= 1 {
+		logger.Printf("ban change blocked: last active admin %q cannot be banned", username)
 		return errLastAdmin
 	}
 
+	oldState := user.Banned
 	user.Banned = banned
 	s.users[key] = user
-	return s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		logger.Printf("save ban change for %q to=%t failed: %v", username, banned, err)
+		return err
+	}
+	logger.Printf("user ban status changed for %q from=%t to=%t", username, oldState, banned)
+	return nil
 }
 
 // Close releases backend resources (important for SQLite file handles).
@@ -493,6 +523,7 @@ func NewSessionManager() *SessionManager {
 func (m *SessionManager) Create(w http.ResponseWriter, username string) error {
 	token, err := randomToken(32)
 	if err != nil {
+		logger.Printf("create session token failed for %q: %v", username, err)
 		return err
 	}
 
@@ -512,6 +543,7 @@ func (m *SessionManager) Create(w http.ResponseWriter, username string) error {
 		Secure:   true,
 	})
 
+	logger.Printf("created session for user=%q expires=%s", username, expires.Format(time.RFC3339))
 	return nil
 }
 
@@ -519,6 +551,9 @@ func (m *SessionManager) Create(w http.ResponseWriter, username string) error {
 func (m *SessionManager) Username(r *http.Request) (string, bool) {
 	cookie, err := r.Cookie(authCookieName)
 	if err != nil || cookie.Value == "" {
+		if err != nil && !errors.Is(err, http.ErrNoCookie) {
+			logger.Printf("read session cookie failed: %v", err)
+		}
 		return "", false
 	}
 
@@ -528,16 +563,19 @@ func (m *SessionManager) Username(r *http.Request) (string, bool) {
 	m.mu.RUnlock()
 	if !ok || now.After(current.ExpiresAt) {
 		if ok {
+			logger.Printf("expired session for token=%q user=%q", cookie.Value, current.Username)
 			m.Delete(cookie.Value)
 		}
 		return "", false
 	}
 
+	logger.Printf("validated session for user=%q", current.Username)
 	return current.Username, true
 }
 
 func (m *SessionManager) Clear(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(authCookieName); err == nil {
+		logger.Printf("clearing session cookie for token=%q", cookie.Value)
 		m.Delete(cookie.Value)
 	}
 
@@ -698,11 +736,12 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, tmpl *template.Temp
 	}
 
 	if err := sessions.Create(w, username); err != nil {
-		logger.Printf("create session: %v", err)
+		logger.Printf("create session for %q failed: %v", username, err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Printf("login successful for user=%q mode=%q", username, mode)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
