@@ -1,5 +1,11 @@
+// WebSocket handling for the Open chat application.
+// Manages WebSocket upgrades, origin checks, and client registration with the chat hub.
+// Provides the entry point for WebSocket communication and ensures secure connections.
+// Ensures that only authorized users can establish WebSocket connections.
+// Relies on Gorilla WebSocket for connection upgrades and provides a secure communication channel.
 package main
 
+// websocket.go handles WebSocket connections for the chat application.
 import (
 	"log"
 	"net/http"
@@ -8,8 +14,12 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
+
 )
 
+/*
+Package main handles WebSocket connections for the chat application.
+*/
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -23,7 +33,7 @@ func checkWebSocketOrigin(r *http.Request) bool {
 	if !ok {
 		return false
 	}
-
+	// Allow same-host browser origins by default.
 	requestHost := strings.TrimSpace(r.Host)
 	if requestHost != "" && strings.EqualFold(origin.Host, requestHost) {
 		return true
@@ -38,6 +48,7 @@ func checkWebSocketOrigin(r *http.Request) bool {
 	return false
 }
 
+// configuredAllowedOrigins returns the list of allowed WebSocket origins from the environment variable.
 func configuredAllowedOrigins() []string {
 	raw := strings.TrimSpace(os.Getenv("OPENCHAT_ALLOWED_ORIGINS"))
 	if raw == "" {
@@ -82,15 +93,18 @@ func serveWebSocket(hub *Hub, logger *log.Logger) http.HandlerFunc {
 		user, _ := r.Context().Value(currentUserContextKey).(currentUser)
 		username := sanitizeUsername(user.Username)
 		if username == "" {
+			logger.Printf("websocket rejected: unauthorized request from %s", r.RemoteAddr)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			logger.Printf("upgrade websocket: %v", err)
+			logger.Printf("websocket upgrade failed for user=%q: %v", username, err)
 			return
 		}
+
+		logger.Printf("websocket connected user=%q remote=%s", username, r.RemoteAddr)
 
 		client := &Client{
 			hub:      hub,

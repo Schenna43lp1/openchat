@@ -1,3 +1,5 @@
+// Unit tests for the main package of the Open chat application.
+// Tests cover environment variable resolution and HTTP handler rendering for the Open chat application.
 package main
 
 import (
@@ -10,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
 )
 
 func testLogger(t *testing.T) *log.Logger {

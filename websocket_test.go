@@ -1,8 +1,11 @@
+// Unit tests for the WebSocket origin check in the Open chat application.
+// Ensures that WebSocket connections are only accepted from allowed origins.
 package main
 
 import (
 	"net/http/httptest"
 	"testing"
+
 )
 
 func TestCheckWebSocketOriginAllowsSameHost(t *testing.T) {

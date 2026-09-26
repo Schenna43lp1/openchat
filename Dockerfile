@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1
-
+# Dockerfile for building and running the Open chat application.
 FROM golang:1.27-alpine AS build
 
 WORKDIR /src
+
+RUN apk add --no-cache git
 
 COPY go.mod go.sum ./
 RUN go mod download

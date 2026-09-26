@@ -1,3 +1,5 @@
+// Hub component for the Open chat application.
+// Manages client registration, message broadcasting, direct messaging, and chat history persistence.
 package main
 
 import (
@@ -9,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 )
 
 const messageHistoryLimit = 100
@@ -108,6 +111,7 @@ func (h *Hub) Run() {
 
 		case message := <-h.broadcast:
 			// Chat messages are persisted in in-memory history and fanned out to all clients.
+			h.logger.Printf("broadcasting message user=%q type=%q recipients=%d", message.Username, message.Type, len(h.clients))
 			h.addToHistory(message)
 			h.saveHistory()
 			h.sendAll(ChatEvent{
@@ -122,15 +126,18 @@ func (h *Hub) Run() {
 		case message := <-h.direct:
 			recipient := strings.TrimSpace(message.To)
 			if recipient == "" {
+				h.logger.Printf("direct message ignored: empty recipient from %q", message.From)
 				continue
 			}
 
 			direct := newMessage(EventDirect, message.From, message.Text)
 			direct.To = recipient
+			h.logger.Printf("routing direct message from %q to %q", message.From, recipient)
 			h.addToHistory(direct)
 			h.saveHistory()
 			delivered := h.sendDirect(direct)
 			if !delivered {
+				h.logger.Printf("direct message could not be delivered: recipient %q offline", recipient)
 				h.sendToUsername(message.From, ChatEvent{
 					Type:      EventSystem,
 					Message:   "Direktnachricht konnte nicht zugestellt werden (Benutzer offline).",

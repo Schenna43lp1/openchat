@@ -2,14 +2,21 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
 # Binaries for programs and plugins
+# Ignore compiled binaries and shared libraries
+# start of binary files section
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 chat.exe
+# end of binary files section
 # Test binary, built with `go test -c`
+# start of test binaries section
 *.test
+# end of test binaries section
+# Environment files
+# start of environment files section
 .env
 data/
 data/sqlite.*
@@ -36,9 +43,12 @@ go.work
 go.work.sum
 auth_test.go
 
-# env file
+# Environment files
 .env
+.testenv    
+# end of environment files section
 .testenv
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+# End of file
