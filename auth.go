@@ -21,7 +21,6 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
-
 )
 
 const (

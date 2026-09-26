@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
 )
 
 func testLogger(t *testing.T) *log.Logger {

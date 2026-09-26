@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-
 )
 
 func TestDirectMessageDeliveredOnlyToParticipants(t *testing.T) {

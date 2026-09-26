@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-
 )
 
 // WebSocket client implementation for Open chat.

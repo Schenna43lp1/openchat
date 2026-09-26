@@ -5,7 +5,6 @@ package main
 import (
 	"net/http/httptest"
 	"testing"
-
 )
 
 func TestCheckWebSocketOriginAllowsSameHost(t *testing.T) {
