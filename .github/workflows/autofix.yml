@@ -1,9 +1,7 @@
-me: autofix.ci  # needed to securely identify the workflow
+name: autofix.ci (legacy)
 
 on:
-  pull_request:
-  push:
-    branches: [ "main" ]
+  workflow_dispatch:
 permissions:
   contents: read
 
@@ -13,6 +11,5 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # TODO: add all code-fixing here.
-
-      - uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a
+      - name: Legacy placeholder
+        run: echo "Use .github/workflows/gofmts.yml for automated formatting fixes."

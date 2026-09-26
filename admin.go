@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-
 )
 
 // Admin interface for managing users in Open chat.
