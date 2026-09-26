@@ -1,3 +1,4 @@
+// Unit tests for the Hub component of the Open chat application.
 package main
 
 import (
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
 )
 
 func TestDirectMessageDeliveredOnlyToParticipants(t *testing.T) {

@@ -5,8 +5,11 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
 )
 
+// Admin interface for managing users in Open chat.
+// Provides HTTP handlers and templates for the admin user management interface.
 type adminUsersViewData struct {
 	CurrentUser    currentUser
 	Users          []authUser

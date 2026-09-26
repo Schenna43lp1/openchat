@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
 )
 
+// WebSocket client implementation for Open chat.
 const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second

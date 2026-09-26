@@ -1,3 +1,12 @@
+// Main package for the Open chat application.
+// Sets up HTTP server, routes, templates, and graceful shutdown.
+// Handles user authentication, session management, and chat functionality.
+// Provides the entry point for the application and initializes all necessary components.
+// Supports both public and direct messaging between users.
+// Designed to be modular and extensible for future enhancements.
+// Utilizes Go's standard library for HTTP handling, templating, and logging.
+// Entry point: main() initializes templates, user store, session manager, and HTTP server.
+// The application supports graceful shutdown and proper resource cleanup.
 package main
 
 import (

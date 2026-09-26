@@ -1,3 +1,4 @@
+// Go module file for the Open chat application.
 module chat
 
 go 1.26.0

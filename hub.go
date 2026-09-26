@@ -1,3 +1,5 @@
+// Hub component for the Open chat application.
+// Manages client registration, message broadcasting, direct messaging, and chat history persistence.
 package main
 
 import (
@@ -9,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 )
 
 const messageHistoryLimit = 100

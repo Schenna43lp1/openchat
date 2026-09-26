@@ -1,3 +1,8 @@
+// WebSocket handling for the Open chat application.
+// Manages WebSocket upgrades, origin checks, and client registration with the chat hub.
+// Provides the entry point for WebSocket communication and ensures secure connections.
+// Ensures that only authorized users can establish WebSocket connections.
+// Relies on Gorilla WebSocket for connection upgrades and provides a secure communication channel.
 package main
 
 // websocket.go handles WebSocket connections for the chat application.
@@ -9,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
+
 )
 
 /*
