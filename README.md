@@ -79,7 +79,7 @@ Der letzte aktive Admin kann nicht entfernt oder gesperrt werden. Eine Sperre be
 
 **Zurücksetzen durch einen Admin:** In der Benutzerliste auf **Passwort zuruecksetzen**. Alle Sessions des Kontos enden, und **seine bisherigen Direktnachrichten werden für dieses Konto dauerhaft ausgeblendet**, damit Admins sie auf diesem Weg nicht lesen können. Die Gesprächspartner behalten sie. Eine Sperre bleibt bestehen.
 
-Ein Admin kann sich mit einem Startpasswort, das er vergeben hat, selbst anmelden und dann **künftige** Nachrichten an das Konto lesen. Wer mit seinem Startpasswort nicht hineinkommt, sollte sich deshalb beim Betreiber melden.
+Ein Admin kann sich mit einem Startpasswort, das er vergeben hat, selbst anmelden, dann **künftige** Nachrichten an das Konto lesen und in dessen Namen schreiben. Setzt er danach erneut zurück, merkt der Besitzer davon nichts. Nachvollziehen kann es nur der Betreiber im Serverlog (`password reset`, `password changed`, `login succeeded`). Die Admin-Rolle deshalb nur an Vertraute vergeben.
 
 **Zurücksetzen durch den Betreiber:** Nur so geht es bei Admins und früheren Admins, auch beim einzigen. Der Verlauf bleibt sichtbar. Den Server vorher stoppen, sonst bleiben offene Verbindungen des Kontos bestehen:
 

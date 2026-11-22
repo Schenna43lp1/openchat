@@ -18,7 +18,7 @@ Admins der App können keine fremden Direktnachrichten lesen. Wer ein Passwort z
 ## Folgen
 
 - Wer sein Passwort vergisst und vom Admin zurückgesetzt wird, verliert die Sicht auf ältere Direktnachrichten.
-- Ein Admin kann ein Startpasswort selbst benutzen und künftige Nachrichten an dieses Konto lesen. Das fällt auf, weil der Besitzer nicht mehr hineinkommt, ist aber nicht verhinderbar.
+- Ein Admin kann ein Startpasswort selbst benutzen, künftige Nachrichten an dieses Konto lesen und in dessen Namen schreiben. Ohne zweiten Kanal ist das nicht verhinderbar. Ein weiterer Reset verdeckt es vor dem Besitzer, sichtbar bleibt es nur im Serverlog.
 - Wer vor der Migration auf Schema 2 herabgestuft wurde, ist nicht mehr als früherer Admin erkennbar.
 - Ausgeblendete Nachrichten bleiben in der Datenbank.
 - Der Betreiber-Befehl braucht einen gestoppten Server, weil offene Verbindungen Änderungen eines anderen Prozesses nicht bemerken (ADR 0001).
