@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -71,6 +71,7 @@ type Hub struct {
 	done       chan struct{}
 
 	clients     map[*Client]bool
+	departed    []string // removed connections that still need an announcement
 	users       userDirectory
 	history     []Message
 	historyPath string
@@ -105,22 +106,25 @@ func NewHubWithHistoryPath(logger *log.Logger, historyPath string, users userDir
 // Run processes register/unregister/broadcast events in a single goroutine.
 func (h *Hub) Run() {
 	for {
+		// Announce outside the send loops, which may drop clients themselves.
+		h.announceDeparted()
+
 		select {
 		case client := <-h.register:
+			arrived := !h.online(client.username)
 			h.clients[client] = true
 			h.logger.Printf("client joined: %s", client.username)
 
 			client.send <- ChatEvent{Type: EventHistory, Messages: h.historyFor(client.username)}
-			h.broadcastSystem(client.username + " hat den Chat betreten.")
+			if arrived {
+				h.broadcastSystem(client.username + " hat den Chat betreten.")
+			}
 			h.broadcastUsers()
 
 		case client := <-h.unregister:
 			if h.clients[client] {
-				delete(h.clients, client)
-				close(client.send)
+				h.remove(client)
 				h.logger.Printf("client left: %s", client.username)
-				h.broadcastSystem(client.username + " hat den Chat verlassen.")
-				h.broadcastUsers()
 			}
 
 		case message := <-h.broadcast:
@@ -214,10 +218,37 @@ func (h *Hub) Notify(client *Client, text string) {
 	}
 }
 
-// broadcastSystem emits system messages (join/leave) to all clients.
+func (h *Hub) online(username string) bool {
+	for client := range h.clients {
+		if strings.EqualFold(client.username, username) {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *Hub) remove(client *Client) {
+	delete(h.clients, client)
+	close(client.send)
+	h.departed = append(h.departed, client.username)
+}
+
+// announceDeparted reports users whose last connection is gone.
+func (h *Hub) announceDeparted() {
+	for len(h.departed) > 0 {
+		username := h.departed[0]
+		h.departed = h.departed[1:]
+		if h.online(username) {
+			continue
+		}
+		h.broadcastSystem(username + " hat den Chat verlassen.")
+		h.broadcastUsers()
+	}
+}
+
+// broadcastSystem emits system messages (join/leave). They are live only and never enter the history.
 func (h *Hub) broadcastSystem(text string) {
 	message := newMessage(EventSystem, "", text)
-	h.addToHistory(message)
 	h.sendAll(ChatEvent{
 		Type:      EventSystem,
 		Message:   message.Message,
@@ -232,7 +263,8 @@ func (h *Hub) broadcastUsers() {
 	for client := range h.clients {
 		users = append(users, client.username)
 	}
-	sort.Strings(users)
+	slices.Sort(users)
+	users = slices.Compact(users) // one entry for several tabs
 	h.sendAll(ChatEvent{Type: EventUsers, Users: users})
 }
 
@@ -242,8 +274,7 @@ func (h *Hub) sendAll(event ChatEvent) {
 		select {
 		case client.send <- event:
 		default:
-			delete(h.clients, client)
-			close(client.send)
+			h.remove(client)
 			if client.conn != nil {
 				_ = client.conn.Close()
 			}
@@ -288,8 +319,7 @@ func (h *Hub) sendOne(client *Client, event ChatEvent) {
 	select {
 	case client.send <- event:
 	default:
-		delete(h.clients, client)
-		close(client.send)
+		h.remove(client)
 		if client.conn != nil {
 			_ = client.conn.Close()
 		}
@@ -348,6 +378,8 @@ func (h *Hub) loadHistory() {
 		h.logger.Printf("decode chat history: %v", err)
 		return
 	}
+	// Files written by older versions also contain join and leave notices.
+	history = slices.DeleteFunc(history, func(m Message) bool { return m.Type == EventSystem })
 	if len(history) > messageHistoryLimit {
 		history = history[len(history)-messageHistoryLimit:]
 	}
