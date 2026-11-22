@@ -7,6 +7,7 @@ Ein leichtgewichtiges Echtzeit-Chat-System zum Selberhosten: ein Go-Binary, eine
 
 - öffentlicher Chat und Direktnachrichten über WebSocket
 - Accounts mit Rollen, Sperren, Passwort-Resets und Verwaltung im Browser
+- Start mit einer Docker-Compose-Datei
 - Sessions und Nachrichten überleben Neustarts
 - responsives Frontend ohne externe Ressourcen
 
@@ -15,6 +16,29 @@ Diese README ist die Dokumentation für Betrieb, Nutzung und Entwicklung. Archit
 ## Schnellstart
 
 Die Registrierung ist standardmäßig geschlossen, und niemand wird automatisch Admin. Den ersten Admin legt der Betreiber beim Start fest.
+
+Docker Compose, im Ordner mit [compose.yaml](compose.yaml) und [.env.example](.env.example):
+
+```bash
+cp .env.example .env
+```
+
+In `.env` das Admin-Passwort setzen, dann:
+
+```bash
+docker compose up -d --wait
+```
+
+Der Port ist nur auf diesem Rechner offen (`OPENCHAT_BIND`). Das Volume heißt wie bei `docker run` `openchat-data`. Wer umsteigt, sichert vorher, stoppt und entfernt den alten Container. Die Daten bleiben, Compose weist beim Start nur darauf hin, dass es das Volume nicht selbst angelegt hat. Andere Einstellungen aus dem alten `docker run` gehören in `.env`.
+
+Aktualisieren, nach einem Backup:
+
+```bash
+docker compose pull
+docker compose up -d --wait
+```
+
+Eigenes Image aus dem Quelltext: `docker build -t openchat:local .` und in `.env` `OPENCHAT_IMAGE=openchat:local`.
 
 Lokal (PowerShell):
 
@@ -63,7 +87,7 @@ Ungültige Werte beenden den Start mit einer Fehlermeldung. Ungültige Origins w
 - **Chat** (`/`): öffentliche Nachrichten, bis 4096 Zeichen.
 - **Direkt-Chat** (`/direct`): Empfänger aus der Online-Liste wählen. Nur Sender und Empfänger sehen die Nachricht. Wer einen Namen später bekommt, erbt keine Nachrichten.
 - **Kontosicherheit** (`/account/password`): vergebene Startpasswörter ansehen und das eigene Passwort ändern. Alle anderen Anmeldungen enden dabei.
-- **Admin** (`/admin/users`): Konten, Passwörter, Rollen und Sperren.
+- **Admin** (`/admin/users`): Konten suchen und filtern. Rolle, Passwort und Sperre ändert man auf der Seite des Kontos.
 
 | Rolle | Darf |
 |---|---|
@@ -75,9 +99,13 @@ Der letzte aktive Admin kann nicht entfernt oder gesperrt werden. Eine Sperre be
 
 ### Konten und Passwörter
 
+**Rolle ändern:** auf der Seite des Kontos, bestätigt mit dem eigenen Passwort. Wer einmal Admin war, dessen Passwort setzt danach nur noch der Betreiber zurück.
+
+**Sperren:** auf der Seite des Kontos in zwei Schritten. Mehrfaches Sperren lässt ein Konto gesperrt, entsperrt wird nur ausdrücklich.
+
 **Konto anlegen:** Unter **Admin** auf **Konto anlegen**. Dafür muss die Registrierung nicht offen sein. Das Konto bekommt die Rolle `user` und ein Startpasswort, das nur einmal angezeigt wird. Damit lässt sich nur ein eigenes Passwort setzen, erst dann geht der Chat.
 
-**Zurücksetzen durch einen Admin:** In der Benutzerliste auf **Passwort zuruecksetzen**. Alle Sessions des Kontos enden, und **seine bisherigen Direktnachrichten werden für dieses Konto dauerhaft ausgeblendet**, damit Admins sie auf diesem Weg nicht lesen können. Die Gesprächspartner behalten sie. Eine Sperre bleibt bestehen.
+**Zurücksetzen durch einen Admin:** Auf der Seite des Kontos auf **Passwort zuruecksetzen**. Alle Sessions des Kontos enden, und **seine bisherigen Direktnachrichten werden für dieses Konto dauerhaft ausgeblendet**, damit Admins sie auf diesem Weg nicht lesen können. Die Gesprächspartner behalten sie. Eine Sperre bleibt bestehen.
 
 Ein Admin kann sich mit einem Startpasswort, das er vergeben hat, selbst anmelden, dann **künftige** Nachrichten an das Konto lesen und in dessen Namen schreiben. Verhindern lässt sich das nicht, aber der Besitzer kann es sehen:
 
@@ -97,6 +125,7 @@ docker start openchat
 
 - Dasselbe Image, dasselbe Volume und dieselben `OPENCHAT_*`-Variablen wie der Server verwenden.
 - Das Startpasswort ist die einzige Zeile auf stdout. `--log-driver none` hält es aus den Docker-Logs.
+- Mit Compose: `docker compose stop`, dann `docker compose run --rm --no-deps -T openchat reset-password betreiber`, dann `docker compose start`.
 - Ohne Docker: `openchat reset-password betreiber` im Arbeitsverzeichnis des Servers.
 
 ### Grenzen
@@ -184,7 +213,8 @@ Ohne gespeicherte Accounts gibt es keinen Admin. Dann wie im Schnellstart mit de
 | `GET /ws` | angemeldet, WebSocket |
 | `GET /session` | 204 angemeldet, sonst 401 oder 403 |
 | `GET, POST /account/password` | angemeldet, auch mit Startpasswort |
-| `GET, POST /admin/users` | Admin und Moderator |
+| `GET /admin/users` | Admin und Moderator, Parameter `q`, `filter`, `page` |
+| `GET, POST /admin/users/{id}` | Admin und Moderator |
 | `GET, POST /admin/users/new` | Admin |
 | `GET, POST /admin/users/{id}/password` | Admin |
 | `GET, POST /login` | alle |
@@ -216,7 +246,8 @@ Client an Server:
 
 ```text
 main.go, config.go     Konfiguration, Start, Shutdown
-command.go             Befehle für den Betreiber
+command.go, health.go  Befehle für Betreiber und Container
+compose.yaml           Betrieb mit Docker Compose
 internal/web           HTTP, WebSocket-Upgrade, Schutz, Templates, Assets
 internal/chat          Hub und Verbindungen
 internal/auth          Regeln für Accounts, Rollen und Sessions
@@ -234,6 +265,7 @@ go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
 go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
 docker build --tag openchat:smoke .
 bash scripts/container-smoke.sh openchat:smoke
+bash scripts/compose-smoke.sh openchat:smoke
 ```
 
 ### Releases
