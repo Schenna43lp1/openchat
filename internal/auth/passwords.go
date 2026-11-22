@@ -33,8 +33,9 @@ func (s *Service) ChangePassword(ctx context.Context, user store.User, current, 
 		s.logger.Warn("password change failed", "user", user.Username, "reason", "wrong password")
 		return store.User{}, ErrWrongPassword
 	}
-	// Otherwise a password that somebody else has seen could be kept.
-	if next == current {
+	// Otherwise a password that somebody else has seen could be kept. Comparing the strings is not enough:
+	// bcrypt repeats the key with a NUL in between, so "pw" and "pw<NUL>pw" are one password.
+	if s.compare([]byte(user.PasswordHash), []byte(next)) == nil {
 		return store.User{}, ErrSamePassword
 	}
 	hash, err := hashPassword(next)

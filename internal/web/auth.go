@@ -48,7 +48,8 @@ func (s *server) authRequired(next http.Handler) http.Handler {
 				s.Logger.Error("end session of banned account", "err", err)
 			}
 			deny(http.StatusForbidden)
-		case user.MustChangePassword && r.URL.Path != passwordPath:
+		// The matched route, not the path: "/account%2Fpassword" has the same path and is served by "/".
+		case user.MustChangePassword && r.Pattern != passwordPath:
 			if wantsStatus {
 				deny(http.StatusUnauthorized)
 			} else {

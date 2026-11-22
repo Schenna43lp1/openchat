@@ -413,3 +413,27 @@ func TestPasswordsAreNeverLogged(t *testing.T) {
 		}
 	}
 }
+
+// bcrypt repeats the key with a NUL in between and reads 72 bytes, so different strings can be one password.
+func TestEquivalentPasswordIsTheSamePassword(t *testing.T) {
+	for name, tc := range map[string]struct {
+		current, next func(issued string) string
+	}{
+		"as the new one":     {func(p string) string { return p }, func(p string) string { return p + "\x00" + p }},
+		"as the current one": {func(p string) string { return p + "\x00" + p }, func(p string) string { return p }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, st := newTestService(t)
+			seed(t, st, "alice", store.RoleUser, false)
+			issued, err := s.OperatorReset(t.Context(), "alice")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = s.ChangePassword(t.Context(), issued.User, tc.current(issued.Password), tc.next(issued.Password))
+			if !errors.Is(err, ErrSamePassword) {
+				_, loginErr := s.Authenticate(t.Context(), "alice", issued.Password)
+				t.Fatalf("error = %v, issued password still works = %t", err, loginErr == nil)
+			}
+		})
+	}
+}

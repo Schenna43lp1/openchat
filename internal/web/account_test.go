@@ -213,3 +213,15 @@ func TestRightPasswordsAreLimitedForTheirCost(t *testing.T) {
 		t.Fatalf("status = %d, want 429", res.StatusCode)
 	}
 }
+
+func TestEscapedPathIsNotThePasswordPage(t *testing.T) {
+	a := startTestApp(t, t.TempDir())
+	seedAccounts(t, a.users, testAccount(t, "alice", store.RoleUser, false))
+	cookie := a.signInWith("alice", a.issue("alice").Password)
+	for _, path := range []string{"/account%2Fpassword", "/%61ccount%2Fpassword"} {
+		res, _ := a.send(http.MethodGet, path, "", map[string]string{"Cookie": cookie})
+		if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != passwordPath {
+			t.Errorf("%s passed the gate: status = %d", path, res.StatusCode)
+		}
+	}
+}
