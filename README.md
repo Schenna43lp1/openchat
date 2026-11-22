@@ -6,7 +6,7 @@
 Ein leichtgewichtiges Echtzeit-Chat-System zum Selberhosten: ein Go-Binary, eine SQLite-Datei, kein externer Dienst.
 
 - öffentlicher Chat und Direktnachrichten über WebSocket
-- Accounts mit Rollen, Sperren und Verwaltung im Browser
+- Accounts mit Rollen, Sperren, Passwort-Resets und Verwaltung im Browser
 - Sessions und Nachrichten überleben Neustarts
 - responsives Frontend ohne externe Ressourcen
 
@@ -62,15 +62,36 @@ Ungültige Werte beenden den Start mit einer Fehlermeldung. Ungültige Origins w
 
 - **Chat** (`/`): öffentliche Nachrichten, bis 4096 Zeichen.
 - **Direkt-Chat** (`/direct`): Empfänger aus der Online-Liste wählen. Nur Sender und Empfänger sehen die Nachricht. Wer einen Namen später bekommt, erbt keine Nachrichten.
-- **Admin** (`/admin/users`): Rollen und Sperren.
+- **Passwort** (`/account/password`): das eigene Passwort ändern. Alle anderen Anmeldungen enden dabei.
+- **Admin** (`/admin/users`): Konten, Passwörter, Rollen und Sperren.
 
 | Rolle | Darf |
 |---|---|
-| `admin` | Rollen ändern, alle anderen sperren und entsperren |
+| `admin` | Konten anlegen, Passwörter von `user` und `moderator` zurücksetzen, Rollen ändern, alle anderen sperren und entsperren |
 | `moderator` | Nutzer mit Rolle `user` sperren und entsperren |
 | `user` | chatten |
 
 Der letzte aktive Admin kann nicht entfernt oder gesperrt werden. Eine Sperre beendet alle Sessions und offenen Verbindungen des Accounts.
+
+### Konten und Passwörter
+
+**Konto anlegen:** Unter **Admin** auf **Konto anlegen**. Dafür muss die Registrierung nicht offen sein. Das Konto bekommt die Rolle `user` und ein Startpasswort, das nur einmal angezeigt wird. Damit lässt sich nur ein eigenes Passwort setzen, erst dann geht der Chat.
+
+**Zurücksetzen durch einen Admin:** In der Benutzerliste auf **Passwort zuruecksetzen**. Alle Sessions des Kontos enden, und **seine bisherigen Direktnachrichten werden für dieses Konto dauerhaft ausgeblendet**, damit Admins sie auf diesem Weg nicht lesen können. Die Gesprächspartner behalten sie. Eine Sperre bleibt bestehen.
+
+Ein Admin kann sich mit einem Startpasswort, das er vergeben hat, selbst anmelden und dann **künftige** Nachrichten an das Konto lesen. Wer mit seinem Startpasswort nicht hineinkommt, sollte sich deshalb beim Betreiber melden.
+
+**Zurücksetzen durch den Betreiber:** Nur so geht es bei Admins und früheren Admins, auch beim einzigen. Der Verlauf bleibt sichtbar. Den Server vorher stoppen, sonst bleiben offene Verbindungen des Kontos bestehen:
+
+```bash
+docker stop openchat
+docker run --rm --log-driver none -v openchat-data:/app/data ghcr.io/schenna43lp1/openchat:latest reset-password betreiber
+docker start openchat
+```
+
+- Dasselbe Image, dasselbe Volume und dieselben `OPENCHAT_*`-Variablen wie der Server verwenden.
+- Das Startpasswort ist die einzige Zeile auf stdout. `--log-driver none` hält es aus den Docker-Logs.
+- Ohne Docker: `openchat reset-password betreiber` im Arbeitsverzeichnis des Servers.
 
 ### Grenzen
 
@@ -78,6 +99,7 @@ Der letzte aktive Admin kann nicht entfernt oder gesperrt werden. Eine Sperre be
 |---|---|
 | Login | 10 Versuche je Adresse, danach einer alle 6 Sekunden |
 | Fehlgeschlagene Logins | 20 je Account, danach einer alle 5 Minuten. Bekannte Browser haben ein eigenes Budget |
+| Passwort bestätigen | 10 Fehlversuche je Account, danach einer alle 5 Minuten. Insgesamt 20 Versuche, danach einer alle 6 Sekunden |
 | Verbindungen | 10 gleichzeitig je Account (Tabs und Geräte) |
 | Registrierung | 5 je Adresse, danach eine alle 12 Minuten |
 | Nachrichten | 10 je Account, danach eine pro Sekunde |
@@ -91,6 +113,11 @@ Das Limit je Account bremst verteiltes Passwortraten. Damit Fremde den Besitzer 
 Alles liegt in `/app/data/openchat.db`, auch Passwort-Hashes und Nachrichten im Klartext. Der Container läuft als UID `65532` und startet nicht, wenn er dort nicht schreiben kann. Bei Bind-Mounts muss das Verzeichnis dieser UID gehören.
 
 Für ein Backup den Container stoppen und das Verzeichnis kopieren.
+
+### Upgrade auf v1.2
+
+- **Vorher ein Backup machen.** Die Datenbank wird beim Start auf Schema 2 gebracht, eine ältere Version lehnt sie danach ab. Ein Downgrade geht nur mit dem Backup.
+- Alle heutigen Admins, auch gesperrte, kann danach nur noch der Betreiber zurücksetzen. Wer schon vor dem Upgrade herabgestuft wurde, ist nicht mehr als früherer Admin erkennbar.
 
 ### Upgrade von v1.0.x auf v1.1
 
@@ -150,13 +177,16 @@ Ohne gespeicherte Accounts gibt es keinen Admin. Dann wie im Schnellstart mit de
 | `GET /`, `GET /direct` | angemeldet |
 | `GET /ws` | angemeldet, WebSocket |
 | `GET /session` | 204 angemeldet, sonst 401 oder 403 |
+| `GET, POST /account/password` | angemeldet, auch mit Startpasswort |
 | `GET, POST /admin/users` | Admin und Moderator |
+| `GET, POST /admin/users/new` | Admin |
+| `GET, POST /admin/users/{id}/password` | Admin |
 | `GET, POST /login` | alle |
 | `POST /logout` | alle |
 | `GET /healthz` | alle, 200 oder 503 |
 | `GET /static/*` | alle |
 
-Browser-POSTs von fremden Origins erhalten 403.
+Browser-POSTs von fremden Origins erhalten 403. Mit einem Startpasswort leiten alle angemeldeten Seiten auf `/account/password`, `/ws` und `/session` antworten 401.
 
 ### WebSocket-Protokoll
 
@@ -180,6 +210,7 @@ Client an Server:
 
 ```text
 main.go, config.go     Konfiguration, Start, Shutdown
+command.go             Befehle für den Betreiber
 internal/web           HTTP, WebSocket-Upgrade, Schutz, Templates, Assets
 internal/chat          Hub und Verbindungen
 internal/auth          Regeln für Accounts, Rollen und Sessions

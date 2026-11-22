@@ -1,0 +1,30 @@
+# ADR 0002: Passwort-Resets und Direktnachrichten
+
+- Status: angenommen, 22.11.2026
+- Gilt ab: v1.2.0
+
+## Kontext
+
+Admins der App können keine fremden Direktnachrichten lesen. Wer ein Passwort zurücksetzt, kann sich als dieses Konto anmelden. Ohne Gegenmaßnahme würde ein Reset diese Grenze aufheben. Einen zweiten Kanal wie E-Mail gibt es nicht.
+
+## Entscheidung
+
+- **Reset durch einen Admin:** Das Konto sieht danach nur noch neue Direktnachrichten (`users.dm_visible_after_id`). Die Gesprächspartner behalten ihren Verlauf. Die Grenze sinkt nie, auch nicht bei späteren Passwortänderungen.
+- **Admins und frühere Admins** setzt nur der Betreiber zurück (`users.operator_reset_only`). Das Merkmal wird nie gelöscht, sonst würde Herabstufen den Reset erlauben.
+- **Reset durch den Betreiber** (`openchat reset-password`) blendet nichts aus. Der Betreiber kann die Datenbank ohnehin lesen.
+- **Startpasswörter** wählt der Server und zeigt sie einmal. Sie erlauben nur, ein eigenes Passwort zu setzen.
+- **Jede Passwortänderung** löscht die Sessions in derselben Transaktion. Eine Session entsteht nur, solange der geprüfte Hash noch gilt.
+
+## Folgen
+
+- Wer sein Passwort vergisst und vom Admin zurückgesetzt wird, verliert die Sicht auf ältere Direktnachrichten.
+- Ein Admin kann ein Startpasswort selbst benutzen und künftige Nachrichten an dieses Konto lesen. Das fällt auf, weil der Besitzer nicht mehr hineinkommt, ist aber nicht verhinderbar.
+- Wer vor der Migration auf Schema 2 herabgestuft wurde, ist nicht mehr als früherer Admin erkennbar.
+- Ausgeblendete Nachrichten bleiben in der Datenbank.
+- Der Betreiber-Befehl braucht einen gestoppten Server, weil offene Verbindungen Änderungen eines anderen Prozesses nicht bemerken (ADR 0001).
+
+## Verworfen
+
+- **Verlauf sichtbar lassen:** Admins könnten die Direktnachrichten aller Nutzer lesen.
+- **Nachrichten löschen:** Der Gesprächspartner verlöre seinen Verlauf.
+- **Admins setzen einander zurück:** Eine gekaperte Admin-Sitzung samt Passwort würde alle Admins übernehmen.
