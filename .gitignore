@@ -1,52 +1,32 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
-# Ignore compiled binaries and shared libraries
-# start of binary files section
+# Binaries. The leading slash matters: internal/chat is source code.
+/chat
+/openchat
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-chat.exe
-# end of binary files section
-# Test binary, built with `go test -c`
-# start of test binaries section
 *.test
-# end of test binaries section
+
+# Runtime data: password hashes, sessions and messages
+/data/
+/openchat-backup/
+
 # Environment files
-# start of environment files section
 .env
-data/
-data/sqlite.*
-data/sqlite3.*
-data/chat.db
-data/chat.db-shm
-data/chat.db-wal
-data/chat.db-journal
-data/chat.db.lock
-data/chat.db-tmp
-.claude
-# Code coverage profiles and other test artifacts
+.testenv
+
+# Coverage and other test artifacts
 *.out
 coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
 # Go workspace file
 go.work
 go.work.sum
 
-# Environment files
-.env
-.testenv    
-# end of environment files section
-.testenv
-# Editor/IDE
+# Editor and tools
 .idea/
 .vscode/
-# End of file
+.claude

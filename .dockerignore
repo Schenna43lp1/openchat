@@ -8,3 +8,10 @@ LICENSE
 tmp/
 dist/
 build/
+.claude
+.env
+.testenv
+data/
+openchat-backup/
+release-drafts/
+*.exe
