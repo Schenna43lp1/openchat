@@ -15,6 +15,7 @@ import (
 const usage = `usage:
   openchat                        start the server
   openchat reset-password NAME    give an account a password that has to be changed at the next login
+  openchat healthcheck            exit with 0 if the server in this container answers
 
 reset-password works on every account, also on admins, and keeps direct messages visible.
 Stop the server first: open connections do not notice changes of another process.
@@ -30,6 +31,8 @@ func runCommand(ctx context.Context, args []string, getenv func(string) string, 
 	case len(args) == 1 && (args[0] == "help" || args[0] == "-h" || args[0] == "--help"):
 		_, err := io.WriteString(stdout, usage)
 		return err
+	case len(args) == 1 && args[0] == "healthcheck":
+		return checkHealth(ctx, getenv)
 	case len(args) == 2 && args[0] == "reset-password":
 		return resetPassword(ctx, args[1], getenv, stdout, stderr)
 	default:

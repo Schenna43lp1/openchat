@@ -312,7 +312,7 @@ func errorMessage(err error) (message string, known bool) {
 	case errors.Is(err, auth.ErrStaffTarget):
 		return "Moderatoren duerfen nur Benutzer mit Rolle user sperren.", true
 	case errors.Is(err, auth.ErrForbidden):
-		return "Nur Admins duerfen das.", true
+		return "Dafuer fehlen dir die Rechte.", true
 	case errors.Is(err, auth.ErrWrongPassword):
 		return "Dein Passwort ist falsch.", true
 	case errors.Is(err, auth.ErrSamePassword):

@@ -56,7 +56,7 @@ func TestIssuedPasswordOnlyAllowsChangingIt(t *testing.T) {
 					t.Errorf("GET %s: status = %d, want 401", path, res.StatusCode)
 				}
 			}
-			a.post("/admin/users", cookie, url.Values{"action": {"toggle_ban"}, "username": {"victim"}})
+			a.post(userPath(a.account("victim")), cookie, url.Values{"action": {"ban"}})
 			if victim, _ := a.users.Find("victim"); victim.Banned {
 				t.Error("an issued password could ban")
 			}

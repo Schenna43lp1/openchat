@@ -65,3 +65,6 @@ jobs:
 
       - name: Smoke test with a volume
         run: bash scripts/container-smoke.sh openchat:smoke
+
+      - name: Smoke test with Docker Compose
+        run: bash scripts/compose-smoke.sh openchat:smoke

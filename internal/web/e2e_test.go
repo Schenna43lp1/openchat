@@ -7,6 +7,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -228,12 +229,17 @@ func TestEndToEnd(t *testing.T) {
 		})
 	}
 
-	if page := admin.open("/admin/users", "/admin/users"); !strings.Contains(page, `value="mallory"`) {
+	list := admin.open("/admin/users", "/admin/users")
+	if !strings.Contains(list, `data-user="mallory"`) {
 		t.Fatal("admin page does not list mallory")
 	}
 	revokedCookies := map[string]*http.Cookie{"mallory": mallory.cookie(), "bob": bob.cookie()}
-	toggleBan := url.Values{"username": {"mallory"}, "action": {"toggle_ban"}}
-	if page := admin.submit("/admin/users", "/admin/users", toggleBan); !strings.Contains(page, "Account wurde gesperrt.") {
+	link := regexp.MustCompile(`href="([^"]+)" data-user="mallory"`).FindStringSubmatch(list)
+	if link == nil {
+		t.Fatal("list does not link to the account")
+	}
+	mallorysPage := link[1]
+	if page := admin.submit(mallorysPage, mallorysPage, url.Values{"action": {"ban"}}); !strings.Contains(page, "Konto wurde gesperrt.") {
 		t.Fatal("ban was not confirmed")
 	}
 	expectRevoked(t, malloryChat)
@@ -282,7 +288,7 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatal("ban was lost in the restart")
 	}
 	admin.signIn("login", "admin", "/")
-	if page := admin.submit("/admin/users", "/admin/users", toggleBan); !strings.Contains(page, "Account wurde entsperrt.") {
+	if page := admin.submit(mallorysPage, mallorysPage, url.Values{"action": {"unban"}}); !strings.Contains(page, "Konto wurde entsperrt.") {
 		t.Fatal("unban was not confirmed")
 	}
 	alice.signIn("login", "alice", "/")

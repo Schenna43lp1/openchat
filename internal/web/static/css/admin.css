@@ -1,4 +1,4 @@
-/* Admin user management page styles. */
+/* User management: list and page of one account. */
 .admin-shell {
   min-height: 100vh;
   padding: 1rem;
@@ -7,10 +7,15 @@
 .admin-panel {
   width: min(1040px, 100%);
   margin: 0 auto;
+  overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--panel);
   box-shadow: var(--shadow);
+}
+
+.admin-panel-narrow {
+  width: min(44rem, 100%);
 }
 
 .admin-header {
@@ -23,69 +28,295 @@
   background: var(--panel-strong);
 }
 
-.admin-header p {
-  margin: 0.25rem 0 0;
+.admin-title {
+  min-width: 0;
+}
+
+.admin-title h1 {
+  overflow-wrap: anywhere;
+}
+
+.admin-title p {
+  margin: 0.4rem 0 0;
   color: var(--muted);
+}
+
+.admin-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .admin-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
+  gap: 0.6rem;
 }
 
-.users-table {
-  display: grid;
-  overflow-x: auto;
-}
-
-.users-row {
-  display: grid;
-  grid-template-columns: minmax(9rem, 1fr) minmax(9rem, 12rem) minmax(7rem, 9rem) minmax(12rem, 1fr) minmax(10rem, 16rem);
-  gap: 0.75rem;
+.admin-button {
+  display: inline-flex;
   align-items: center;
-  min-width: 54rem;
-  padding: 0.75rem 1rem;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border-radius: var(--radius-soft);
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.admin-button:not(.button-secondary) {
+  background: var(--accent);
+  color: #04110c;
+}
+
+.button-danger,
+.button-danger:hover {
+  background: var(--danger);
+  color: #2b0710;
+}
+
+.admin-message {
+  margin: 1rem 1rem 0;
+}
+
+.users-tools {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
   border-bottom: 1px solid var(--line);
 }
 
-.users-row:last-child {
-  border-bottom: 0;
-}
-
-.users-row-head {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.users-row button {
-  min-height: 2.4rem;
-  width: 100%;
-}
-
-.users-actions {
-  display: grid;
+.users-search {
+  display: flex;
   gap: 0.5rem;
 }
 
-.users-row select {
-  height: 2.4rem;
-  padding: 0 0.65rem;
+.users-search input {
+  flex: 1;
+  min-width: 0;
+}
+
+.users-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.users-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.users-filter span {
+  color: var(--text);
+}
+
+.users-filter[aria-current] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.users-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.users-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.user-row {
+  display: grid;
+  grid-template-areas: "name tags created open";
+  grid-template-columns: minmax(0, 1fr) 17rem 11rem 1rem;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  min-height: 3.75rem;
+  padding: 0.75rem 1rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.user-row:hover {
+  background: var(--panel-strong);
+}
+
+/* Inside, the panel clips what is drawn around a row. */
+.user-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.user-name {
+  grid-area: name;
+  min-width: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.user-tags {
+  display: flex;
+  flex-wrap: wrap;
+  grid-area: tags;
+  gap: 0.4rem;
+}
+
+.user-created {
+  grid-area: created;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.user-open {
+  grid-area: open;
+  color: var(--muted);
+  font-size: 1.5rem;
+}
+
+.users-empty {
+  margin: 0;
+  padding: 2rem 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.users-pages {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.users-pages [rel="prev"] {
+  justify-self: start;
+}
+
+.users-pages [rel="next"] {
+  justify-self: end;
+}
+
+.admin-section {
+  padding: 1.1rem 1rem;
+}
+
+.admin-section + .admin-section {
+  border-top: 1px solid var(--line);
+}
+
+.admin-section > p {
+  color: var(--muted);
+}
+
+.admin-form {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.admin-form > label {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.role-options {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.role-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius-soft);
+  cursor: pointer;
+}
+
+.role-option input {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0.15rem 0 0;
+  accent-color: var(--accent);
+}
+
+.role-option span {
+  color: var(--muted);
+}
+
+.role-option strong {
+  display: block;
+  color: var(--text);
+}
+
+.role-option:has(input:checked) {
+  border-color: var(--accent);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.admin-history {
+  margin-top: 0.75rem;
+}
+
+.admin-history summary {
+  padding: 0.7rem 0;
+  cursor: pointer;
+}
+
+.ban-confirm summary {
+  width: fit-content;
+  list-style: none;
+}
+
+.ban-confirm summary::-webkit-details-marker {
+  display: none;
+}
+
+.ban-confirm form {
+  margin-top: 0.75rem;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 1.8rem;
-  padding: 0.1rem 0.5rem;
+  min-height: 1.6rem;
+  padding: 0.1rem 0.55rem;
   border: 1px solid #365447;
   border-radius: 999px;
   background: #16231d;
   color: var(--accent);
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   font-weight: 800;
 }
 
@@ -95,13 +326,28 @@
   color: #fde68a;
 }
 
-.users-reset {
-  font-size: 0.85rem;
-  text-align: center;
-}
-
 .status-badge-banned {
   border-color: rgba(251, 113, 133, 0.45);
   background: rgba(251, 113, 133, 0.12);
   color: #fecdd3;
+}
+
+.status-badge-self {
+  border-color: var(--field-line);
+  background: none;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .user-row {
+    grid-template-areas:
+      "name open"
+      "tags open"
+      "created open";
+    grid-template-columns: minmax(0, 1fr) 1rem;
+  }
+
+  .admin-section .admin-button {
+    width: 100%;
+  }
 }

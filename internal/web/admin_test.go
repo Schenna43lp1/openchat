@@ -61,6 +61,15 @@ func (f *accessFixture) request(method, path, actor string, form url.Values) *ht
 	return rec
 }
 
+// manage posts an action to the page of target. An unknown name becomes an ID without an account.
+func (f *accessFixture) manage(actor, target string, form url.Values) *httptest.ResponseRecorder {
+	path := "/admin/users/999"
+	if user, ok := f.users.Find(target); ok {
+		path = userPath(user)
+	}
+	return f.request(http.MethodPost, path, actor, form)
+}
+
 func TestRoutePermissions(t *testing.T) {
 	const (
 		ok        = http.StatusOK
@@ -127,7 +136,11 @@ func TestBanPermissions(t *testing.T) {
 						}
 					}
 				}
-				f.request(http.MethodPost, "/admin/users", actor, url.Values{"username": {target}, "action": {"toggle_ban"}})
+				action := "ban"
+				if user, ok := f.users.Find(target); ok && user.Banned {
+					action = "unban"
+				}
+				f.manage(actor, target, url.Values{"action": {action}})
 				if got := f.users.List(); !reflect.DeepEqual(got, want) {
 					t.Fatalf("accounts = %+v, want %+v", got, want)
 				}
@@ -148,7 +161,7 @@ func TestRolePermissions(t *testing.T) {
 		{"other-admin", store.RoleUser},
 	}
 	for _, actor := range []string{"admin", "moderator", "user", "banned-admin", "banned-moderator", "anonymous"} {
-		// An empty action is handled as a role change and needs the same checks.
+		// An empty action used to be a role change and must change nothing now.
 		for _, action := range []string{"set_role", ""} {
 			for _, change := range changes {
 				target := change.target
@@ -158,7 +171,7 @@ func TestRolePermissions(t *testing.T) {
 				t.Run(actor+"/"+action+"/"+target+"/"+string(change.role), func(t *testing.T) {
 					f := newAccessFixture(t)
 					want := f.users.List()
-					if actor == "admin" {
+					if actor == "admin" && action == "set_role" {
 						for i := range want {
 							if want[i].Username == target {
 								want[i].Role = change.role
@@ -166,8 +179,12 @@ func TestRolePermissions(t *testing.T) {
 							}
 						}
 					}
-					f.request(http.MethodPost, "/admin/users", actor,
-						url.Values{"username": {target}, "action": {action}, "role": {string(change.role)}})
+					from := ""
+					if user, ok := f.users.Find(target); ok {
+						from = string(user.Role)
+					}
+					f.manage(actor, target, url.Values{"action": {action}, "role": {string(change.role)},
+						"from": {from}, "confirmation": {testPassword}})
 					if got := f.users.List(); !reflect.DeepEqual(got, want) {
 						t.Fatalf("accounts = %+v, want %+v", got, want)
 					}
@@ -182,21 +199,34 @@ func TestUserManagementFeedback(t *testing.T) {
 		name, actor, target, action, role string
 		message                           string
 	}{
-		{"ban", "admin", "other-user", "toggle_ban", "", "Account wurde gesperrt."},
-		{"unban", "admin", "banned", "toggle_ban", "", "Account wurde entsperrt."},
+		{"ban", "admin", "other-user", "ban", "", "Konto wurde gesperrt."},
+		{"ban again", "admin", "banned", "ban", "", "Konto wurde gesperrt."},
+		{"unban", "admin", "banned", "unban", "", "Konto wurde entsperrt."},
 		{"role change", "admin", "other-user", "set_role", "moderator", "Rolle wurde aktualisiert."},
-		{"self ban", "admin", "ADMIN", "toggle_ban", "", "eigenen Account nicht sperren"},
-		{"self ban by moderator", "moderator", " Moderator ", "toggle_ban", "", "eigenen Account nicht sperren"},
-		{"moderator bans staff", "moderator", "other-admin", "toggle_ban", "", "nur Benutzer mit Rolle user"},
-		{"moderator changes role", "moderator", "user", "set_role", "admin", "Nur Admins"},
+		{"self ban", "admin", "admin", "ban", "", "eigenen Account nicht sperren"},
+		{"self ban by moderator", "moderator", "moderator", "ban", "", "eigenen Account nicht sperren"},
+		{"moderator bans staff", "moderator", "other-admin", "ban", "", "nur Benutzer mit Rolle user"},
+		{"moderator changes role", "moderator", "user", "set_role", "admin", "fehlen dir die Rechte"},
 		{"invalid role", "admin", "user", "set_role", "owner", "Diese Rolle ist nicht erlaubt."},
-		{"role of unknown user", "admin", "ghost", "set_role", "user", "wurde nicht gefunden"},
-		{"ban of unknown user", "admin", "ghost", "toggle_ban", "", "wurde nicht gefunden"},
+		{"role of unknown user", "admin", "ghost", "set_role", "user", "404"},
+		{"ban of unknown user", "admin", "ghost", "ban", "", "404"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newAccessFixture(t)
-			rec := f.request(http.MethodPost, "/admin/users", tc.actor,
-				url.Values{"username": {tc.target}, "action": {tc.action}, "role": {tc.role}})
+			form := url.Values{"action": {tc.action}, "role": {tc.role}, "confirmation": {testPassword}}
+			if user, ok := f.users.Find(tc.target); ok {
+				form.Set("from", string(user.Role))
+			}
+			rec := f.manage(tc.actor, tc.target, form)
+			if rec.Code == http.StatusSeeOther {
+				rec = f.request(http.MethodGet, rec.Header().Get("Location"), tc.actor, nil)
+			}
+			if tc.message == "404" {
+				if rec.Code != http.StatusNotFound {
+					t.Fatalf("status = %d, want 404", rec.Code)
+				}
+				return
+			}
 			if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), tc.message) {
 				t.Fatalf("status = %d, want message %q", rec.Code, tc.message)
 			}
@@ -209,8 +239,8 @@ func TestLastAdminCannotDemoteThemselves(t *testing.T) {
 	if err := f.users.SetBanned("other-admin", true); err != nil {
 		t.Fatal(err)
 	}
-	rec := f.request(http.MethodPost, "/admin/users", "admin",
-		url.Values{"username": {"admin"}, "action": {"set_role"}, "role": {"user"}})
+	rec := f.manage("admin", "admin",
+		url.Values{"action": {"set_role"}, "from": {"admin"}, "role": {"user"}, "confirmation": {testPassword}})
 	if !strings.Contains(rec.Body.String(), "letzte aktive Admin") {
 		t.Fatal("refusal is not explained")
 	}
@@ -232,7 +262,8 @@ func TestRoleChangeAppliesToExistingSession(t *testing.T) {
 func TestOnlyAdminsSeeRoleControls(t *testing.T) {
 	f := newAccessFixture(t)
 	for actor, want := range map[string]bool{"admin": true, "moderator": false} {
-		body := f.request(http.MethodGet, "/admin/users", actor, nil).Body.String()
+		target, _ := f.users.Find("other-user")
+		body := f.request(http.MethodGet, userPath(target), actor, nil).Body.String()
 		if got := strings.Contains(body, `value="set_role"`); got != want {
 			t.Errorf("%s sees role controls = %t, want %t", actor, got, want)
 		}
@@ -243,8 +274,10 @@ func TestAdminPageEscapesStoredNames(t *testing.T) {
 	f := newAccessFixture(t)
 	const name = "<script>alert(1)</script>"
 	seedAccounts(t, f.users, testAccount(t, name, store.RoleUser, false))
-	if body := f.request(http.MethodGet, "/admin/users", "admin", nil).Body.String(); strings.Contains(body, name) {
-		t.Fatal("stored name was rendered as HTML")
+	for _, path := range []string{"/admin/users", userPath(f.account(name))} {
+		if body := f.request(http.MethodGet, path, "admin", nil).Body.String(); strings.Contains(body, name) {
+			t.Fatalf("%s rendered a stored name as HTML", path)
+		}
 	}
 }
 
@@ -261,6 +294,8 @@ func TestMethodsAndPaths(t *testing.T) {
 		{http.MethodPost, "/", "user", http.StatusMethodNotAllowed},
 		{http.MethodGet, "/missing", "user", http.StatusNotFound},
 		{http.MethodDelete, "/admin/users", "admin", http.StatusMethodNotAllowed},
+		{http.MethodPost, "/admin/users", "admin", http.StatusMethodNotAllowed},
+		{http.MethodDelete, "/admin/users/1", "admin", http.StatusMethodNotAllowed},
 	} {
 		if rec := f.request(tc.method, tc.path, tc.actor, nil); rec.Code != tc.status {
 			t.Errorf("%s %s as %s: status = %d, want %d", tc.method, tc.path, tc.actor, rec.Code, tc.status)
@@ -270,7 +305,7 @@ func TestMethodsAndPaths(t *testing.T) {
 
 func TestInvalidFormsAreRejected(t *testing.T) {
 	f := newAccessFixture(t)
-	for _, path := range []string{"/login", "/admin/users"} {
+	for _, path := range []string{"/login", "/admin/users/1"} {
 		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader("%zz"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(f.cookies["admin"])
@@ -280,7 +315,7 @@ func TestInvalidFormsAreRejected(t *testing.T) {
 			t.Errorf("%s with malformed form: status = %d, want 400", path, rec.Code)
 		}
 	}
-	if rec := f.request(http.MethodPost, "/admin/users", "admin", url.Values{"action": {"delete"}}); rec.Code != http.StatusBadRequest {
+	if rec := f.request(http.MethodPost, "/admin/users/1", "admin", url.Values{"action": {"delete"}}); rec.Code != http.StatusBadRequest {
 		t.Errorf("unknown action: status = %d, want 400", rec.Code)
 	}
 }

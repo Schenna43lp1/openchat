@@ -1,0 +1,59 @@
+# Open chat with Docker Compose. Settings go into .env, see .env.example.
+#
+#   docker compose up -d --wait
+#   docker compose logs -f
+#
+# Forgotten password, also of the only admin:
+#
+#   docker compose stop
+#   docker compose run --rm --no-deps -T openchat reset-password NAME
+#   docker compose start
+name: openchat
+
+services:
+  openchat:
+    image: ${OPENCHAT_IMAGE:-ghcr.io/schenna43lp1/openchat:latest}
+    restart: unless-stopped
+    ports:
+      # Only this machine by default, put a reverse proxy with HTTPS in front of it.
+      - "${OPENCHAT_BIND:-127.0.0.1}:${OPENCHAT_HOST_PORT:-8080}:8080"
+    environment:
+      # Fixed, the port and the paths belong to the container. Empty values mean the default of the server.
+      OPENCHAT_PORT: "8080"
+      OPENCHAT_DB_FILE: /app/data/openchat.db
+      OPENCHAT_ADMIN_USERNAME: ${OPENCHAT_ADMIN_USERNAME:-}
+      OPENCHAT_ADMIN_PASSWORD: ${OPENCHAT_ADMIN_PASSWORD:-}
+      OPENCHAT_ALLOW_REGISTRATION: ${OPENCHAT_ALLOW_REGISTRATION:-false}
+      OPENCHAT_COOKIE_SECURE: ${OPENCHAT_COOKIE_SECURE:-true}
+      OPENCHAT_ALLOWED_ORIGINS: ${OPENCHAT_ALLOWED_ORIGINS:-}
+      OPENCHAT_TRUSTED_PROXIES: ${OPENCHAT_TRUSTED_PROXIES:-}
+    volumes:
+      - data:/app/data
+    healthcheck:
+      # The image has no shell and no curl.
+      test: ["CMD", "/app/openchat", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+    # The server takes up to 8 seconds to close connections and the database.
+    stop_grace_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  data:
+    # The same volume as in the docker run examples, so switching to Compose keeps the data.
+    name: ${OPENCHAT_VOLUME:-openchat-data}

@@ -143,7 +143,7 @@ func TestNoWayToResetAdminsInTheApp(t *testing.T) {
 		if a.account(name) != target {
 			t.Fatalf("%s: account was changed", step)
 		}
-		if _, list := a.send(http.MethodGet, "/admin/users", "", map[string]string{"Cookie": admin}); strings.Contains(list, resetPath(target)) {
+		if _, list := a.send(http.MethodGet, userPath(target), "", map[string]string{"Cookie": admin}); strings.Contains(list, resetPath(target)) {
 			t.Errorf("%s: reset is offered", step)
 		}
 	}
@@ -151,7 +151,11 @@ func TestNoWayToResetAdminsInTheApp(t *testing.T) {
 	expectBlocked("other admin", "other")
 	expectBlocked("banned admin", "banned")
 	for _, role := range []string{"moderator", "user"} {
-		a.post("/admin/users", admin, url.Values{"action": {"set_role"}, "username": {"other"}, "role": {role}})
+		other := a.account("other")
+		a.post(userPath(other), admin, url.Values{"action": {"set_role"}, "from": {string(other.Role)}, "role": {role}, "confirmation": {testPassword}})
+		if string(a.account("other").Role) != role {
+			t.Fatalf("setup: role change to %s failed", role)
+		}
 		expectBlocked("demoted to "+role, "other")
 	}
 }

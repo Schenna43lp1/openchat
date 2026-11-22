@@ -198,15 +198,50 @@ func (s *Service) List(ctx context.Context) ([]store.User, error) {
 	return s.store.Users(ctx)
 }
 
-// SetRole is for admins and keeps one active admin.
+// SetRole is for admins and keeps one active admin. The app uses ChangeRole, which also asks for the password.
 func (s *Service) SetRole(ctx context.Context, actor store.User, username string, role store.Role) error {
+	return s.setRole(ctx, actor, username, role, func(store.User, store.User) error { return nil })
+}
+
+// ChangeRole is SetRole confirmed with the password of the admin. Making somebody admin cannot be taken back
+// completely, see store.User.OperatorResetOnly, and a stolen session must not be enough for it.
+// from is the role that the admin saw.
+func (s *Service) ChangeRole(ctx context.Context, actor store.User, confirmation string, targetID int64, from, to store.Role) error {
+	if err := s.confirmAdmin(actor, confirmation); err != nil {
+		return err
+	}
+	target, err := s.FindID(ctx, targetID)
+	if err != nil {
+		return err
+	}
+	return s.setRole(ctx, actor, target.Username, to, func(now, current store.User) error {
+		if err := stillAdmin(now, actor); err != nil {
+			return err
+		}
+		if current.Role != from {
+			return ErrAccountChanged
+		}
+		return nil
+	})
+}
+
+func (s *Service) setRole(ctx context.Context, actor store.User, username string, role store.Role, check func(now, target store.User) error) error {
 	if actor.Role != store.RoleAdmin {
 		return ErrForbidden
 	}
 	if !role.Valid() {
 		return ErrInvalidRole
 	}
-	before, after, err := s.store.UpdateUser(ctx, strings.TrimSpace(username), func(u *store.User, activeAdmins int) error {
+	before, after, err := s.store.UpdateUserBy(ctx, actor.ID, strings.TrimSpace(username), func(now store.User, u *store.User, activeAdmins int) error {
+		// The role from the beginning of the request can be outdated by now. ID 0 is the operator.
+		if actor.ID != 0 {
+			if now.Role != store.RoleAdmin || now.Banned || now.MustChangePassword {
+				return ErrForbidden
+			}
+		}
+		if err := check(now, *u); err != nil {
+			return err
+		}
 		if u.Role == store.RoleAdmin && !u.Banned && role != store.RoleAdmin && activeAdmins <= 1 {
 			return ErrLastAdmin
 		}
@@ -223,30 +258,53 @@ func (s *Service) SetRole(ctx context.Context, actor store.User, username string
 	return nil
 }
 
-// ToggleBan bans or unbans and reports the new state. A ban ends all sessions of the account.
-func (s *Service) ToggleBan(ctx context.Context, actor store.User, username string) (bool, error) {
-	if !actor.Role.Staff() {
-		return false, ErrForbidden
+// CanBan reports whether actor may ban and unban target.
+func CanBan(actor, target store.User) bool {
+	return banRefusal(actor, target) == nil
+}
+
+func banRefusal(actor, target store.User) error {
+	switch {
+	case !actor.Role.Staff() || actor.Banned || actor.MustChangePassword:
+		return ErrForbidden
+	case target.ID == actor.ID:
+		return ErrSelfBan
+	case actor.Role == store.RoleModerator && target.Role != store.RoleUser:
+		return ErrStaffTarget
+	default:
+		return nil
 	}
-	_, after, err := s.store.UpdateUser(ctx, strings.TrimSpace(username), func(u *store.User, activeAdmins int) error {
-		switch {
-		case u.ID == actor.ID:
-			return ErrSelfBan
-		case actor.Role == store.RoleModerator && u.Role != store.RoleUser:
-			return ErrStaffTarget
-		case u.Role == store.RoleAdmin && !u.Banned && activeAdmins <= 1:
+}
+
+// SetBanned bans or unbans. It names the wanted state instead of switching it, so that doing it twice, a
+// reload or two moderators at once cannot undo a ban. A ban ends all sessions of the account.
+func (s *Service) SetBanned(ctx context.Context, actor store.User, username string, banned bool) error {
+	if !actor.Role.Staff() {
+		return ErrForbidden
+	}
+	// Also on errors: SQLite can report one for a write that happened. Checking again is harmless.
+	defer s.revision.Add(1)
+	before, after, err := s.store.UpdateUserBy(ctx, actor.ID, strings.TrimSpace(username), func(now store.User, u *store.User, activeAdmins int) error {
+		if actor.ID == 0 {
+			now = actor // the operator has no account
+		}
+		if err := banRefusal(now, *u); err != nil {
+			return err
+		}
+		if banned && u.Role == store.RoleAdmin && !u.Banned && activeAdmins <= 1 {
 			return ErrLastAdmin
 		}
-		u.Banned = !u.Banned
+		u.Banned = banned
 		return nil
 	})
 	if errors.Is(err, store.ErrNotFound) {
-		return false, ErrUnknownUser
+		return ErrUnknownUser
 	}
 	if err != nil {
-		return false, err
+		return err
 	}
-	s.revision.Add(1)
-	s.logger.Info("ban changed", "by", actor.Username, "user", after.Username, "banned", after.Banned)
-	return after.Banned, nil
+	if before.Banned != after.Banned {
+		s.logger.Info("ban changed", "by", actor.Username, "user", after.Username, "banned", after.Banned)
+	}
+	return nil
 }

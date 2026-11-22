@@ -2,6 +2,8 @@
 .github
 .gitignore
 Dockerfile
+compose.yaml
+.env.example
 README.md
 LICENSE
 *.log

@@ -26,7 +26,7 @@ func cancelDuringWrite(delay time.Duration) (context.Context, context.CancelFunc
 func TestInterruptedRevocationReachesOpenConnections(t *testing.T) {
 	revocations := map[string]func(s *Service, ctx context.Context, token string){
 		"logout": func(s *Service, ctx context.Context, token string) { _ = s.EndSession(ctx, token) },
-		"ban":    func(s *Service, ctx context.Context, _ string) { _, _ = s.ToggleBan(ctx, operator, "victim") },
+		"ban":    func(s *Service, ctx context.Context, _ string) { _ = s.SetBanned(ctx, operator, "victim", true) },
 	}
 	for name, revoke := range revocations {
 		t.Run(name, func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestInterruptedRevocationReachesOpenConnections(t *testing.T) {
 				if u, err := s.Find(t.Context(), "victim"); err != nil {
 					t.Fatal(err)
 				} else if u.Banned {
-					if _, err := s.ToggleBan(t.Context(), operator, "victim"); err != nil {
+					if err := s.SetBanned(t.Context(), operator, "victim", false); err != nil {
 						t.Fatal(err)
 					}
 				}

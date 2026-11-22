@@ -143,7 +143,7 @@ func TestRevokedConnectionsAreClosed(t *testing.T) {
 	const shortSession = 1500 * time.Millisecond
 	cases := map[string]func(a *testApp, admin, victim string){
 		"ban": func(a *testApp, admin, _ string) {
-			a.post("/admin/users", admin, url.Values{"username": {"victim"}, "action": {"toggle_ban"}})
+			a.post(userPath(a.account("victim")), admin, url.Values{"action": {"ban"}})
 		},
 		"logout": func(a *testApp, _, victim string) {
 			a.post("/logout", victim, nil)
@@ -235,8 +235,9 @@ func TestFailedSaveRollsBack(t *testing.T) {
 		form url.Values
 	}{
 		"registration": {"/login", url.Values{"mode": {"register"}, "username": {"newcomer"}, "password": {testPassword}}},
-		"role change":  {"/admin/users", url.Values{"username": {"member"}, "action": {"set_role"}, "role": {"moderator"}}},
-		"ban":          {"/admin/users", url.Values{"username": {"member"}, "action": {"toggle_ban"}}},
+		"role change": {userPath(a.account("member")), url.Values{"action": {"set_role"}, "from": {"user"}, "role": {"moderator"},
+			"confirmation": {testPassword}}},
+		"ban": {userPath(a.account("member")), url.Values{"action": {"ban"}}},
 	} {
 		// Not "wrong password": the user has to learn that saving failed.
 		if _, body := a.post(request.path, admin, request.form); !strings.Contains(body, "nicht gespeichert") {
