@@ -4,8 +4,7 @@ package main
 import (
 	"errors"
 	"html/template"
-	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -282,7 +281,7 @@ func TestAdminTemplateFailureReturnsServerError(t *testing.T) {
 		"fail": func() (string, error) { return "", errors.New("render failed") },
 	}).Parse("{{fail}}"))
 	rec := httptest.NewRecorder()
-	renderAdminUsers(rec, tmpl, adminUsersViewData{}, log.New(io.Discard, "", 0))
+	renderAdminUsers(rec, tmpl, adminUsersViewData{}, slog.New(slog.DiscardHandler))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", rec.Code)
 	}

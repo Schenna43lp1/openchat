@@ -4,7 +4,7 @@ package main
 import (
 	"html/template"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -38,7 +38,7 @@ func startE2EServer(t *testing.T, dir, usersFile string) *e2eServer {
 	if err := users.EnsureAdmin("admin", testPassword); err != nil {
 		t.Fatal(err)
 	}
-	l := log.New(io.Discard, "", 0)
+	l := slog.New(slog.DiscardHandler)
 	hub := NewHubWithHistoryPath(l, filepath.Join(dir, "history.json"), users)
 	hubDone := make(chan struct{})
 	go func() {

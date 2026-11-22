@@ -13,8 +13,7 @@ import (
 	"context"
 	_ "embed"
 	"html/template"
-	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -37,64 +36,60 @@ const (
 	messageInterval = time.Second
 )
 
-var logger = log.New(io.Discard, "", 0)
+var logger = slog.New(slog.DiscardHandler)
 
 func main() {
-	logger = log.New(os.Stdout, "chat: ", log.LstdFlags|log.Lshortfile)
+	logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	tmpl, err := template.ParseFiles("templates/index.html")
 	if err != nil {
-		logger.Fatalf("parse template: %v", err)
-		logger.Println("exiting due to template parse error")
+		fatal(logger, "parse template", "name", "index", "err", err)
 	}
 
 	directTmpl, err := template.ParseFiles("templates/direct.html")
 	if err != nil {
-		logger.Fatalf("parse direct template: %v", err)
-		logger.Println("exiting due to direct template parse error")
+		fatal(logger, "parse template", "name", "direct", "err", err)
 	}
 
 	loginTmpl, err := template.ParseFiles("templates/login.html")
 	if err != nil {
-		logger.Fatalf("parse login template: %v", err)
-		logger.Println("exiting due to login template parse error")
+		fatal(logger, "parse template", "name", "login", "err", err)
 	}
 
 	adminTmpl, err := template.ParseFiles("templates/admin.html")
 	if err != nil {
-		logger.Fatalf("parse admin template: %v", err)
+		fatal(logger, "parse template", "name", "admin", "err", err)
 	}
 
 	cfg, err := loadConfig(os.Getenv)
 	if err != nil {
-		logger.Fatalf("configuration: %v", err)
+		fatal(logger, "invalid configuration", "err", err)
 	}
 
 	for _, path := range []string{resolveUsersStorePath(), resolveChatHistoryPath()} {
 		if err := ensureWritable(path); err != nil {
-			logger.Fatalf("storage is not writable by uid %d (on Docker volumes, run chown -R 65532:65532 on the data directory): %v", os.Getuid(), err)
+			fatal(logger, "storage is not writable (on Docker volumes, run chown -R 65532:65532 on the data directory)", "uid", os.Getuid(), "err", err)
 		}
 	}
 
 	// User storage backend/path is resolved from env and can point to JSON or SQLite.
-	logger.Printf("loading user store from %s", resolveUsersStorePath())
 	users, err := NewUserStore(resolveUsersStorePath())
 	if err != nil {
-		logger.Fatalf("load users: %v", err)
+		fatal(logger, "load users", "err", err)
 	}
-	logger.Printf("user store ready: %s", resolveUsersStorePath())
+	logger.Info("user store ready", "path", resolveUsersStorePath())
 	defer func() {
 		if err := users.Close(); err != nil {
-			logger.Printf("close user store: %v", err)
+			logger.Error("close user store", "err", err)
 		}
 	}()
 	if cfg.adminUsername != "" {
 		if err := users.EnsureAdmin(cfg.adminUsername, cfg.adminPassword); err != nil {
-			logger.Fatalf("create admin from %s: %v", envAdminUsername, err)
+			fatal(logger, "create admin from "+envAdminUsername, "err", err)
 		}
 	}
 	if !users.HasActiveAdmin() {
-		logger.Printf("no active admin: set %s and %s and restart", envAdminUsername, envAdminPassword)
+		logger.Warn("no active admin, set " + envAdminUsername + " and " + envAdminPassword + " and restart")
 	}
 	sessions := NewSessionManager()
 
@@ -104,7 +99,7 @@ func main() {
 
 	mux, err := newRouter(appTemplates{index: tmpl, direct: directTmpl, login: loginTmpl, admin: adminTmpl}, users, sessions, hub, cfg, logger)
 	if err != nil {
-		logger.Fatalf("configure routes: %v", err)
+		fatal(logger, "configure routes", "err", err)
 	}
 
 	server := &http.Server{
@@ -114,13 +109,18 @@ func main() {
 	}
 
 	go func() {
-		logger.Printf("starting http server on http://localhost%s", defaultAddr)
+		logger.Info("starting http server", "addr", defaultAddr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatalf("listen and serve: %v", err)
+			fatal(logger, "listen and serve", "err", err)
 		}
 	}()
 
 	waitForShutdown(logger, server, hub)
+}
+
+func fatal(logger *slog.Logger, message string, args ...any) {
+	logger.Error(message, args...)
+	os.Exit(1)
 }
 
 type appTemplates struct {
@@ -128,7 +128,7 @@ type appTemplates struct {
 }
 
 // newRouter wires all routes with their access checks.
-func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *Hub, cfg config, logger *log.Logger) (http.Handler, error) {
+func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *Hub, cfg config, logger *slog.Logger) (http.Handler, error) {
 	mux := http.NewServeMux()
 	mux.Handle("/", authRequired(sessions, users, indexHandler(t.index, logger)))
 	mux.Handle("/direct", authRequired(sessions, users, directHandler(t.direct, logger)))
@@ -164,17 +164,17 @@ type indexViewData struct {
 }
 
 // indexHandler renders the chat UI for authenticated users.
-func indexHandler(tmpl *template.Template, logger *log.Logger) http.Handler {
+func indexHandler(tmpl *template.Template, logger *slog.Logger) http.Handler {
 	return chatPageHandler("/", tmpl, logger)
 }
 
 // directHandler renders the direct message UI for authenticated users.
-func directHandler(tmpl *template.Template, logger *log.Logger) http.Handler {
+func directHandler(tmpl *template.Template, logger *slog.Logger) http.Handler {
 	return chatPageHandler("/direct", tmpl, logger)
 }
 
 // chatPageHandler renders the chat page for the given path.
-func chatPageHandler(path string, tmpl *template.Template, logger *log.Logger) http.Handler {
+func chatPageHandler(path string, tmpl *template.Template, logger *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != path {
 			http.NotFound(w, r)
@@ -193,28 +193,28 @@ func chatPageHandler(path string, tmpl *template.Template, logger *log.Logger) h
 			CanManageUsers: isStaffRole(user.Role),
 		}
 		if err := tmpl.Execute(w, data); err != nil {
-			logger.Printf("execute template: %v", err)
+			logger.Error("execute template", "err", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 		}
 	})
 }
 
 // loggingMiddleware logs the HTTP requests with method, path, and duration.
-func loggingMiddleware(logger *log.Logger, next http.Handler) http.Handler {
+func loggingMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		next.ServeHTTP(w, r)
-		logger.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start).Round(time.Millisecond))
+		logger.Info("request", "method", r.Method, "path", r.URL.Path, "duration", time.Since(start).Round(time.Millisecond))
 	})
 }
 
 // waitForShutdown performs graceful shutdown for HTTP server and websocket hub.
-func waitForShutdown(logger *log.Logger, server *http.Server, hub *Hub) {
+func waitForShutdown(logger *slog.Logger, server *http.Server, hub *Hub) {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
 
-	logger.Println("shutdown signal received")
+	logger.Info("shutdown signal received")
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
@@ -222,23 +222,20 @@ func waitForShutdown(logger *log.Logger, server *http.Server, hub *Hub) {
 	hub.Close()
 
 	if err := server.Shutdown(ctx); err != nil {
-		logger.Printf("graceful shutdown failed: %v", err)
+		logger.Error("graceful shutdown failed", "err", err)
 		if err := server.Close(); err != nil {
-			logger.Printf("force close failed: %v", err)
+			logger.Error("force close failed", "err", err)
 		}
 	}
 
-	logger.Println("server stopped")
-	logger.Println("shutdown complete")
+	logger.Info("server stopped")
 }
 
 // resolveUsersStorePath allows overriding the default user storage file by env var.
 func resolveUsersStorePath() string {
 	if path := os.Getenv("OPENCHAT_USERS_FILE"); path != "" {
-		logger.Printf("using custom users store path: %s", path)
 		return path
 	}
-	logger.Printf("using default users store path: %s", usersFile)
 	return usersFile
 }
 

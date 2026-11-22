@@ -2,7 +2,7 @@ package main
 
 import (
 	"html/template"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 )
@@ -20,7 +20,7 @@ type adminUsersViewData struct {
 
 // adminUsersHandler renders and processes the user management screen.
 // Admins can change roles and ban/unban users, moderators can only ban/unban users.
-func adminUsersHandler(tmpl *template.Template, users *UserStore, logger *log.Logger) http.Handler {
+func adminUsersHandler(tmpl *template.Template, users *UserStore, logger *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/admin/users" {
 			http.NotFound(w, r)
@@ -96,9 +96,9 @@ func adminUsersHandler(tmpl *template.Template, users *UserStore, logger *log.Lo
 }
 
 // renderAdminUsers executes the admin template with prebuilt view data.
-func renderAdminUsers(w http.ResponseWriter, tmpl *template.Template, data adminUsersViewData, logger *log.Logger) {
+func renderAdminUsers(w http.ResponseWriter, tmpl *template.Template, data adminUsersViewData, logger *slog.Logger) {
 	if err := tmpl.Execute(w, data); err != nil {
-		logger.Printf("execute admin template: %v", err)
+		logger.Error("execute admin template", "err", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }

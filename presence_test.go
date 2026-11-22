@@ -3,8 +3,7 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"log"
+	"log/slog"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -34,7 +33,7 @@ func TestSeveralTabsCountAsOnePresence(t *testing.T) {
 }
 
 func TestReconnectsDoNotDisplaceMessages(t *testing.T) {
-	hub := NewHubWithHistoryPath(log.New(io.Discard, "", 0), filepath.Join(t.TempDir(), "history.json"), testDirectory)
+	hub := NewHubWithHistoryPath(slog.New(slog.DiscardHandler), filepath.Join(t.TempDir(), "history.json"), testDirectory)
 	for i := range messageHistoryLimit {
 		hub.addToHistory(newMessage(EventMessage, "alice", fmt.Sprint("message ", i)))
 	}
@@ -68,7 +67,7 @@ func TestStoredJoinNoticesAreNotLoaded(t *testing.T) {
 		stored = append(stored, Message{Type: EventSystem, Message: "joined"})
 	}
 	writeFixture(t, path, stored)
-	hub := NewHubWithHistoryPath(log.New(io.Discard, "", 0), path, testDirectory)
+	hub := NewHubWithHistoryPath(slog.New(slog.DiscardHandler), path, testDirectory)
 	if len(hub.history) != 1 || hub.history[0].Message != "keep me" {
 		t.Fatalf("history = %+v", hub.history)
 	}

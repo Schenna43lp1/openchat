@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -38,7 +38,7 @@ type Client struct {
 	conn     *websocket.Conn
 	send     chan ChatEvent
 	username string
-	logger   *log.Logger
+	logger   *slog.Logger
 
 	// authorized is checked before every inbound and outbound event and periodically while idle.
 	authorized func() bool
@@ -71,7 +71,7 @@ func (c *Client) readPump() {
 		_, rawMessage, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				c.logger.Printf("read websocket: %v", err)
+				c.logger.Warn("read websocket", "user", c.username, "err", err)
 			}
 			break
 		}
@@ -89,7 +89,7 @@ func (c *Client) readPump() {
 		rawMessage = bytes.TrimSpace(bytes.ReplaceAll(rawMessage, newline, []byte{' '}))
 		var inbound inboundMessage
 		if err := json.Unmarshal(rawMessage, &inbound); err != nil {
-			c.logger.Printf("invalid message from %q: %v", c.username, err)
+			c.logger.Warn("invalid message", "user", c.username, "err", err)
 			c.hub.Notify(c, "Die Nachricht war ungueltig und wurde nicht gesendet.")
 			continue
 		}
@@ -100,19 +100,16 @@ func (c *Client) readPump() {
 			continue
 		}
 		if text == "" {
-			logger.Printf("ignored empty message from %q", c.username)
 			continue
 		}
 
 		if inbound.To != nil {
 			// Never shorten the recipient: a truncated name can match a different account.
 			recipient := strings.TrimSpace(*inbound.To)
-			logger.Printf("direct message from %q to %q length=%d", c.username, recipient, len(text))
 			c.hub.SendDirectMessage(c.username, recipient, text)
 			continue
 		}
 
-		logger.Printf("broadcast message from %q length=%d", c.username, len(text))
 		c.hub.BroadcastMessage(c.username, text)
 	}
 }
@@ -139,7 +136,7 @@ func (c *Client) writePump() {
 			}
 
 			if err := c.conn.WriteJSON(event); err != nil {
-				c.logger.Printf("write websocket: %v", err)
+				c.logger.Warn("write websocket", "user", c.username, "err", err)
 				return
 			}
 

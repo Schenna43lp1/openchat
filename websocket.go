@@ -7,7 +7,7 @@ package main
 
 // websocket.go handles WebSocket connections for the chat application.
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -82,7 +82,7 @@ func normalizeOrigin(raw string) (*url.URL, bool) {
 }
 
 // serveWebSocket upgrades authenticated HTTP requests and registers chat clients at the hub.
-func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, messages *rateLimiter, logger *log.Logger) http.HandlerFunc {
+func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, messages *rateLimiter, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -94,18 +94,18 @@ func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, messag
 		username := user.Username
 		cookie, err := r.Cookie(authCookieName)
 		if username == "" || err != nil {
-			logger.Printf("websocket rejected: unauthorized request from %s", r.RemoteAddr)
+			logger.Warn("websocket rejected", "remote", r.RemoteAddr)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			logger.Printf("websocket upgrade failed for user=%q: %v", username, err)
+			logger.Warn("websocket upgrade failed", "user", username, "err", err)
 			return
 		}
 
-		logger.Printf("websocket connected user=%q remote=%s", username, r.RemoteAddr)
+		logger.Info("websocket connected", "user", username, "remote", r.RemoteAddr)
 
 		token := cookie.Value
 		client := &Client{

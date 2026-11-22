@@ -3,8 +3,7 @@ package main
 
 import (
 	"encoding/json"
-	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +25,7 @@ var testDirectory = fakeDirectory{
 
 func startTestHub(t *testing.T) *Hub {
 	t.Helper()
-	hub := NewHubWithHistoryPath(log.New(io.Discard, "", 0), filepath.Join(t.TempDir(), "history.json"), testDirectory)
+	hub := NewHubWithHistoryPath(slog.New(slog.DiscardHandler), filepath.Join(t.TempDir(), "history.json"), testDirectory)
 	done := make(chan struct{})
 	go func() {
 		hub.Run()
@@ -88,7 +87,7 @@ func TestDirectMessageToOfflineUserSendsSystemNotice(t *testing.T) {
 
 func TestChatHistoryIsPersistedToDisk(t *testing.T) {
 	historyPath := filepath.Join(t.TempDir(), "chat-history.json")
-	hub := NewHubWithHistoryPath(log.New(io.Discard, "", 0), historyPath, testDirectory)
+	hub := NewHubWithHistoryPath(slog.New(slog.DiscardHandler), historyPath, testDirectory)
 	hub.addToHistory(Message{Type: EventMessage, Username: "alice", Message: "hello", Time: "10:00:00", Timestamp: 1})
 	hub.addToHistory(Message{Type: EventDirect, Username: "alice", To: "bob", Message: "secret", Time: "10:01:00", Timestamp: 2})
 	hub.saveHistory()

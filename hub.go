@@ -4,7 +4,7 @@ package main
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -75,18 +75,18 @@ type Hub struct {
 	users       userDirectory
 	history     []Message
 	historyPath string
-	logger      *log.Logger
+	logger      *slog.Logger
 
 	closeOnce sync.Once
 }
 
 // NewHub creates the central chat event broker.
-func NewHub(logger *log.Logger, users userDirectory) *Hub {
+func NewHub(logger *slog.Logger, users userDirectory) *Hub {
 	return NewHubWithHistoryPath(logger, resolveChatHistoryPath(), users)
 }
 
 // NewHubWithHistoryPath creates the hub and loads persisted chat history from disk.
-func NewHubWithHistoryPath(logger *log.Logger, historyPath string, users userDirectory) *Hub {
+func NewHubWithHistoryPath(logger *slog.Logger, historyPath string, users userDirectory) *Hub {
 	hub := &Hub{
 		register:    make(chan *Client),
 		unregister:  make(chan *Client),
@@ -113,7 +113,7 @@ func (h *Hub) Run() {
 		case client := <-h.register:
 			arrived := !h.online(client.username)
 			h.clients[client] = true
-			h.logger.Printf("client joined: %s", client.username)
+			h.logger.Info("client joined", "user", client.username)
 
 			client.send <- ChatEvent{Type: EventHistory, Messages: h.historyFor(client.username)}
 			if arrived {
@@ -124,12 +124,11 @@ func (h *Hub) Run() {
 		case client := <-h.unregister:
 			if h.clients[client] {
 				h.remove(client)
-				h.logger.Printf("client left: %s", client.username)
+				h.logger.Info("client left", "user", client.username)
 			}
 
 		case message := <-h.broadcast:
 			// Chat messages are persisted in in-memory history and fanned out to all clients.
-			h.logger.Printf("broadcasting message user=%q type=%q recipients=%d", message.Username, message.Type, len(h.clients))
 			h.addToHistory(message)
 			h.saveHistory()
 			h.sendAll(ChatEvent{
@@ -145,7 +144,7 @@ func (h *Hub) Run() {
 			// Only existing accounts may be addressed, otherwise whoever registers the name later could be targeted.
 			recipient, ok := h.users.Find(message.To)
 			if !ok {
-				h.logger.Printf("direct message rejected: unknown recipient from %q", message.From)
+				h.logger.Warn("direct message rejected", "from", message.From)
 				notice := newMessage(EventSystem, "", "Direktnachricht wurde nicht gesendet (Empfaenger unbekannt).")
 				h.sendToUsername(message.From, ChatEvent{
 					Type:      EventSystem,
@@ -158,12 +157,10 @@ func (h *Hub) Run() {
 
 			direct := newMessage(EventDirect, message.From, message.Text)
 			direct.To = recipient.Username
-			h.logger.Printf("routing direct message from %q to %q", message.From, direct.To)
 			h.addToHistory(direct)
 			h.saveHistory()
 			delivered := h.sendDirect(direct)
 			if !delivered {
-				h.logger.Printf("direct message could not be delivered: recipient %q offline", direct.To)
 				h.sendToUsername(message.From, ChatEvent{
 					Type:      EventSystem,
 					Message:   "Benutzer ist offline. Die Direktnachricht steht im Verlauf, bis neuere Nachrichten sie verdraengen.",
@@ -180,7 +177,7 @@ func (h *Hub) Run() {
 			}
 
 		case <-h.done:
-			h.logger.Println("hub shutting down")
+			h.logger.Info("hub shutting down")
 			for client := range h.clients {
 				delete(h.clients, client)
 				close(client.send)
@@ -278,7 +275,7 @@ func (h *Hub) sendAll(event ChatEvent) {
 			if client.conn != nil {
 				_ = client.conn.Close()
 			}
-			h.logger.Printf("dropped slow client: %s", client.username)
+			h.logger.Warn("dropped slow client", "user", client.username)
 		}
 	}
 }
@@ -323,7 +320,7 @@ func (h *Hub) sendOne(client *Client, event ChatEvent) {
 		if client.conn != nil {
 			_ = client.conn.Close()
 		}
-		h.logger.Printf("dropped slow client: %s", client.username)
+		h.logger.Warn("dropped slow client", "user", client.username)
 	}
 }
 
@@ -369,13 +366,13 @@ func (h *Hub) loadHistory() {
 	raw, err := os.ReadFile(h.historyPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			h.logger.Printf("load chat history: %v", err)
+			h.logger.Error("load chat history", "err", err)
 		}
 		return
 	}
 	var history []Message
 	if err := json.Unmarshal(raw, &history); err != nil {
-		h.logger.Printf("decode chat history: %v", err)
+		h.logger.Error("decode chat history", "err", err)
 		return
 	}
 	// Files written by older versions also contain join and leave notices.
@@ -391,16 +388,16 @@ func (h *Hub) saveHistory() {
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(h.historyPath), 0o755); err != nil {
-		h.logger.Printf("create chat history dir: %v", err)
+		h.logger.Error("create chat history dir", "err", err)
 		return
 	}
 	raw, err := json.MarshalIndent(h.history, "", "  ")
 	if err != nil {
-		h.logger.Printf("encode chat history: %v", err)
+		h.logger.Error("encode chat history", "err", err)
 		return
 	}
 	if err := os.WriteFile(h.historyPath, raw, 0o644); err != nil {
-		h.logger.Printf("save chat history: %v", err)
+		h.logger.Error("save chat history", "err", err)
 	}
 }
 

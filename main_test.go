@@ -5,8 +5,7 @@ package main
 import (
 	"context"
 	"html/template"
-	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -14,9 +13,9 @@ import (
 	"testing"
 )
 
-func testLogger(t *testing.T) *log.Logger {
+func testLogger(t *testing.T) *slog.Logger {
 	t.Helper()
-	return log.New(io.Discard, "", 0)
+	return slog.New(slog.DiscardHandler)
 }
 
 // By default the application should keep using the legacy JSON location.

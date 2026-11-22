@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -47,7 +47,7 @@ func startTestAppWith(t *testing.T, dir string, cfg config) *testApp {
 	if err != nil {
 		t.Fatal(err)
 	}
-	l := log.New(io.Discard, "", 0)
+	l := slog.New(slog.DiscardHandler)
 	a := &testApp{t: t, dir: dir, users: users, sessions: NewSessionManager(), hubDone: make(chan struct{})}
 	a.hub = NewHubWithHistoryPath(l, filepath.Join(dir, "history.json"), users)
 	go func() {
