@@ -8,5 +8,5 @@
 *.go @Schenna43lp1
 
 # Frontend
-static/** @Schenna43lp1
-templates/** @Schenna43lp1
+internal/web/static/** @Schenna43lp1
+internal/web/templates/** @Schenna43lp1

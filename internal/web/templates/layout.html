@@ -1,0 +1,30 @@
+{{define "layout"}}<!doctype html>
+<html lang="de">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}}</title>
+  <meta name="description" content="{{.Description}}">
+  <meta name="author" content="Markus Stuefer">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0d1118">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body{{if .Scope}} data-chat-scope="{{.Scope}}"{{end}}>
+  {{template "content" .Data}}
+
+  <footer>
+    <p>Open chat &copy; 2026</p>
+    <p>Made with ❤️ by <a href="https://markusstuefer.com">Markus Stuefer</a></p>
+  </footer>
+  {{if .Scope}}
+  <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
+  <!-- Last, because it looks up the elements above when it runs. -->
+  <script src="/static/app.js"></script>
+  {{end}}
+</body>
+
+</html>
+{{end}}
