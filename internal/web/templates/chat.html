@@ -29,6 +29,10 @@
             <a class="top-nav__link" href="/admin/users">Admin</a>
             {{end}}
           </nav>
+          {{with .LastIssue}}
+          <!-- In the header: the sidebar is below the fold on phones. -->
+          <a class="account-notice" href="/account/password">Startpasswort vergeben am {{.At.UTC.Format "02.01.2006 15:04"}} UTC. Verlauf pruefen</a>
+          {{end}}
         </div>
         <div class="chat-header-meta">
           <button type="button" class="notify-toggle" id="notificationToggle" aria-live="polite">
@@ -72,9 +76,6 @@
         <a class="account-link" href="/admin/users">Benutzer verwalten</a>
         {{end}}
         <a class="account-link" href="/account/password">Passwort aendern</a>
-        {{with .LastIssue}}
-        <a class="account-notice" href="/account/password">Startpasswort vergeben am {{.At.UTC.Format "02.01.2006 15:04"}} UTC. Verlauf pruefen</a>
-        {{end}}
         <form method="post" action="/logout">
           <button type="submit" class="button-secondary">Logout</button>
         </form>

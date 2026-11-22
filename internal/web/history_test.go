@@ -122,3 +122,37 @@ func TestUnreadableHistoryIsNotShownAsEmpty(t *testing.T) {
 		}
 	}
 }
+
+// No second reset: the admin sets the issued password again as an own one, so the owner is never forced to the page.
+func TestTakeoverWithoutASecondResetIsShownAtLogin(t *testing.T) {
+	a := startTestApp(t, t.TempDir())
+	admin := a.signInAdmin()
+	seedAccounts(t, a.users, testAccount(t, "victim", store.RoleUser, false))
+
+	issued := a.resetByAdmin(admin, "victim")
+	asVictim := a.chooseOwnPassword("victim", issued)
+	if res, _ := a.post(passwordPath, asVictim, passwordForm(ownPassword, issued)); res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("setting the issued password again: status = %d", res.StatusCode)
+	}
+
+	res, _ := a.post("/login", "", url.Values{"username": {"victim"}, "password": {issued}})
+	if got := res.Header.Get("Location"); got != passwordPath {
+		t.Fatalf("owner lands at %q, want the history", got)
+	}
+	var session string
+	var device *http.Cookie
+	for _, cookie := range res.Cookies() {
+		switch cookie.Name {
+		case cookieName:
+			session = cookie.Name + "=" + cookie.Value
+		case deviceCookieName:
+			device = cookie
+		}
+	}
+	expectParts(t, a.pageWith(passwordPath, session), "1-mal vergeben, 1-mal eingeloest", "eingeloest am")
+
+	// A browser that has seen it goes to the chat. The browser of the admin cannot do that for the owner.
+	if rec := a.loginFrom(7, "victim", issued, device); rec.Header().Get("Location") != "/" {
+		t.Fatalf("known browser lands at %q", rec.Header().Get("Location"))
+	}
+}

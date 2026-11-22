@@ -127,6 +127,7 @@ func (s *server) loginPost(w http.ResponseWriter, r *http.Request) {
 
 	var user store.User
 	var err error
+	var knownDevice bool
 	switch r.FormValue("mode") {
 	case "register":
 		if !s.AllowRegistration {
@@ -152,6 +153,7 @@ func (s *server) loginPost(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			break
 		}
+		knownDevice = isKnownDevice(r, name, hash)
 		allowed, wait, succeeded := s.guard.admit(r, name, hash)
 		if !allowed {
 			s.tooMany(w, username, wait)
@@ -183,7 +185,23 @@ func (s *server) loginPost(w http.ResponseWriter, r *http.Request) {
 
 	s.setCookie(w, token, expires)
 	rememberDevice(w, user.Username, user.PasswordHash, !s.InsecureCookie)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	next := "/"
+	if !knownDevice && s.hasIssueHistory(r.Context(), user) {
+		next = passwordPath
+	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
+}
+
+// hasIssueHistory decides where a login from a browser lands that has never used the current password.
+// The forced page is not enough: whoever used an issued password can set the same one again as an own one
+// and hand that over. The device cookie ends with every new hash, so nobody can dismiss this for the owner.
+func (s *server) hasIssueHistory(ctx context.Context, user store.User) bool {
+	history, err := s.Auth.IssueHistory(ctx, user)
+	if err != nil {
+		s.Logger.Error("read issued passwords", "user", user.Username, "err", err)
+		return true // that page reports the failure
+	}
+	return history.Total > 0
 }
 
 // admit applies a rate limit before any expensive work is done.
