@@ -174,7 +174,6 @@ type chatView struct {
 	Role           store.Role
 	Direct         bool
 	CanManageUsers bool
-	LastIssue      *store.PasswordIssue
 }
 
 func (s *server) chatPage(path string) http.Handler {
@@ -189,16 +188,7 @@ func (s *server) chatPage(path string) http.Handler {
 		}
 
 		user := userFrom(r.Context())
-		history, err := s.Auth.IssueHistory(r.Context(), user)
-		if err != nil {
-			s.Logger.Error("read issued passwords", "user", user.Username, "err", err)
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
 		view := chatView{Username: user.Username, Role: user.Role, CanManageUsers: user.Role.Staff()}
-		if len(history.Latest) > 0 {
-			view.LastIssue = &history.Latest[0]
-		}
 		p := page{Title: "Open chat", Description: "Oeffentlicher Chat fuer Open chat", Scope: "public"}
 		if path == "/direct" {
 			view.Direct = true

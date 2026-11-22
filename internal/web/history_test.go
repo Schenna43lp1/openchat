@@ -90,25 +90,56 @@ func TestOperatorResetIsShownAsSuch(t *testing.T) {
 	expectParts(t, a.pageWith(passwordPath, a.signInWith("root", issued.Password)), "durch den Betreiber", "1-mal vergeben, 0-mal eingeloest")
 }
 
-func TestChatPointsToTheHistory(t *testing.T) {
+func TestChatLinksToAccountSecurity(t *testing.T) {
 	a := startTestApp(t, t.TempDir())
 	admin := a.signInAdmin()
 	seedAccounts(t, a.users, testAccount(t, "victim", store.RoleUser, false), testAccount(t, "bob", store.RoleUser, false))
 	victim := a.chooseOwnPassword("victim", a.resetByAdmin(admin, "victim"))
 
-	for _, path := range []string{"/", "/direct"} {
-		expectParts(t, a.pageWith(path, victim), "account-notice", "Startpasswort vergeben")
-		// Seeing it must not make it go away, the one who sees it first may be the admin.
-		expectParts(t, a.pageWith(path, victim), "account-notice")
-	}
-	expectParts(t, a.pageWith(passwordPath, victim), "1-mal vergeben, 1-mal eingeloest")
-
 	bob := a.signIn("login", "bob")
-	for _, path := range []string{"/", passwordPath} {
-		if body := a.pageWith(path, bob); strings.Contains(body, "account-notice") || strings.Contains(body, "issue-history") {
-			t.Errorf("%s shows a history to an account without one", path)
+	for _, cookie := range []string{victim, bob} {
+		for _, path := range []string{"/", "/direct"} {
+			body := a.pageWith(path, cookie)
+			expectParts(t, body, `class="header-link" href="/account/password">Kontosicherheit</a>`)
+			// Almost every account of a closed instance has a history, so a warning here would mean nothing.
+			// The login from a new browser is what shows it.
+			if strings.Contains(body, "Startpasswort vergeben") {
+				t.Errorf("%s shows a standing warning", path)
+			}
 		}
 	}
+	// Seeing it must not make it go away, the one who sees it first may be the admin.
+	for range 2 {
+		expectParts(t, a.pageWith(passwordPath, victim), "1-mal vergeben, 1-mal eingeloest")
+	}
+	if body := a.pageWith(passwordPath, bob); strings.Contains(body, "issue-history") {
+		t.Error("history shown to an account without one")
+	}
+}
+
+func TestSecurityPageIsNoForcedChange(t *testing.T) {
+	a := startTestApp(t, t.TempDir())
+	admin := a.signInAdmin()
+	seedAccounts(t, a.users, testAccount(t, "victim", store.RoleUser, false), testAccount(t, "bob", store.RoleUser, false))
+	issued := a.resetByAdmin(admin, "victim")
+
+	if forced := a.pageWith(passwordPath, a.signInWith("victim", issued)); strings.Contains(forced, "Weiter zum Chat") || strings.Contains(forced, "Du musst nichts aendern") {
+		t.Fatal("forced page offers a way out")
+	}
+
+	body := a.pageWith(passwordPath, a.chooseOwnPassword("victim", issued))
+	expectParts(t, body, "<h1>Kontosicherheit</h1>", "Du musst nichts aendern", "Weiter zum Chat")
+	last := -1
+	// What happened, then the way out, then the details and the form.
+	for _, part := range []string{"1-mal vergeben, 1-mal eingeloest", "beim Betreiber", "Weiter zum Chat", `class="issue-list"`, `id="current"`} {
+		at := strings.Index(body, part)
+		if at <= last {
+			t.Fatalf("%q is out of order", part)
+		}
+		last = at
+	}
+
+	expectParts(t, a.pageWith(passwordPath, a.signIn("login", "bob")), "<h1>Kontosicherheit</h1>", "Weiter zum Chat")
 }
 
 func TestUnreadableHistoryIsNotShownAsEmpty(t *testing.T) {
@@ -116,10 +147,12 @@ func TestUnreadableHistoryIsNotShownAsEmpty(t *testing.T) {
 	seedAccounts(t, a.users, testAccount(t, "alice", store.RoleUser, false))
 	cookie := a.signIn("login", "alice")
 	a.exec(`DROP TABLE password_issues`)
-	for _, path := range []string{"/", passwordPath} {
-		if res, _ := a.send(http.MethodGet, path, "", map[string]string{"Cookie": cookie}); res.StatusCode != http.StatusInternalServerError {
-			t.Errorf("%s: status = %d, want 500", path, res.StatusCode)
-		}
+	if res, _ := a.send(http.MethodGet, passwordPath, "", map[string]string{"Cookie": cookie}); res.StatusCode != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500", res.StatusCode)
+	}
+	// A login must not skip the page only because it cannot be read.
+	if res, _ := a.post("/login", "", url.Values{"username": {"alice"}, "password": {testPassword}}); res.Header.Get("Location") != passwordPath {
+		t.Errorf("login lands at %q", res.Header.Get("Location"))
 	}
 }
 

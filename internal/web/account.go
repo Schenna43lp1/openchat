@@ -42,7 +42,11 @@ func (s *server) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	view := passwordView{Username: user.Username, Forced: user.MustChangePassword, History: history}
 	show := func(status int) {
-		s.render(w, status, "account", page{Title: "Passwort | Open chat", Description: "Passwort in Open chat aendern", Data: view})
+		title := "Kontosicherheit | Open chat"
+		if view.Forced {
+			title = "Passwort aendern | Open chat"
+		}
+		s.render(w, status, "account", page{Title: title, Description: "Kontosicherheit in Open chat", Data: view})
 	}
 
 	switch r.Method {

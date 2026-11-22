@@ -62,7 +62,7 @@ Ungültige Werte beenden den Start mit einer Fehlermeldung. Ungültige Origins w
 
 - **Chat** (`/`): öffentliche Nachrichten, bis 4096 Zeichen.
 - **Direkt-Chat** (`/direct`): Empfänger aus der Online-Liste wählen. Nur Sender und Empfänger sehen die Nachricht. Wer einen Namen später bekommt, erbt keine Nachrichten.
-- **Passwort** (`/account/password`): das eigene Passwort ändern. Alle anderen Anmeldungen enden dabei.
+- **Kontosicherheit** (`/account/password`): vergebene Startpasswörter ansehen und das eigene Passwort ändern. Alle anderen Anmeldungen enden dabei.
 - **Admin** (`/admin/users`): Konten, Passwörter, Rollen und Sperren.
 
 | Rolle | Darf |
@@ -81,8 +81,8 @@ Der letzte aktive Admin kann nicht entfernt oder gesperrt werden. Eine Sperre be
 
 Ein Admin kann sich mit einem Startpasswort, das er vergeben hat, selbst anmelden, dann **künftige** Nachrichten an das Konto lesen und in dessen Namen schreiben. Verhindern lässt sich das nicht, aber der Besitzer kann es sehen:
 
-- Unter **Passwort** steht, wann wer ein Startpasswort vergeben hat und wann damit ein eigenes Passwort gesetzt wurde (**eingeloest**). In der App kann das niemand löschen.
-- Nach einem Reset erscheint diese Liste vor dem Wechsel des Passworts, außerdem nach jedem Login aus einem Browser, der das aktuelle Passwort noch nicht benutzt hat. Im Chat verweist ein Hinweis darauf.
+- Unter **Kontosicherheit** steht, wann wer ein Startpasswort vergeben hat und wann damit ein eigenes Passwort gesetzt wurde (**eingeloest**). In der App kann das niemand löschen.
+- Nach einem Reset erscheint diese Liste vor dem Wechsel des Passworts, außerdem nach jedem Login aus einem Browser, der das aktuelle Passwort noch nicht benutzt hat. Aus dem Chat führt der Link **Kontosicherheit** dorthin.
 - **Ein eingelöstes Startpasswort, das der Besitzer nicht selbst eingelöst hat, bedeutet: Jemand anderes hatte das Konto.** Dann den Betreiber fragen. Er findet die Einzelheiten im Serverlog (`password reset`, `password changed`, `login succeeded`).
 
 Das hilft nur, wenn die Nutzer die Liste lesen. Die Admin-Rolle nur an Vertraute vergeben.

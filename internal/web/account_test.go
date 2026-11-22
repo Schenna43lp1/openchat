@@ -62,7 +62,7 @@ func TestIssuedPasswordOnlyAllowsChangingIt(t *testing.T) {
 			}
 
 			res, body := a.send(http.MethodGet, passwordPath, "", headers)
-			if res.StatusCode != http.StatusOK || !strings.Contains(body, "Startpasswort") || strings.Contains(body, "Zurueck zum Chat") {
+			if res.StatusCode != http.StatusOK || !strings.Contains(body, "Startpasswort") || strings.Contains(body, `href="/"`) {
 				t.Fatalf("password page: %d %s", res.StatusCode, body)
 			}
 			if res, _ := a.post("/logout", cookie, nil); res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/login" {
