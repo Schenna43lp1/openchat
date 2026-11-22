@@ -37,8 +37,8 @@ func TestOpenMigratesOnce(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "openchat.db")
 	for range 2 {
 		s := openTest(t, path)
-		if got := schemaVersion(t.Context(), t, s); got != 2 {
-			t.Fatalf("schema version = %d, want 2", got)
+		if got := schemaVersion(t.Context(), t, s); got != 3 {
+			t.Fatalf("schema version = %d, want 3", got)
 		}
 		if err := s.Ping(t.Context()); err != nil {
 			t.Fatal(err)
@@ -78,13 +78,14 @@ func TestFailedMigrationIsRolledBack(t *testing.T) {
 	files := fstest.MapFS{
 		"migrations/0001_init.sql":   {Data: []byte("SELECT 1;")},
 		"migrations/0002_second.sql": {Data: []byte("SELECT 1;")},
-		"migrations/0003_broken.sql": {Data: []byte("CREATE TABLE half_done (id INTEGER); INSERT INTO missing VALUES (1);")},
+		"migrations/0003_third.sql":  {Data: []byte("SELECT 1;")},
+		"migrations/0004_broken.sql": {Data: []byte("CREATE TABLE half_done (id INTEGER); INSERT INTO missing VALUES (1);")},
 	}
 	if err := migrate(t.Context(), s.db, files); err == nil {
 		t.Fatal("broken migration succeeded")
 	}
-	if got := schemaVersion(t.Context(), t, s); got != 2 {
-		t.Fatalf("schema version = %d, want 2", got)
+	if got := schemaVersion(t.Context(), t, s); got != 3 {
+		t.Fatalf("schema version = %d, want 3", got)
 	}
 	var tables int
 	if err := s.db.QueryRowContext(t.Context(), `SELECT count(*) FROM sqlite_master WHERE name = 'half_done'`).Scan(&tables); err != nil || tables != 0 {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Schenna43lp1/openchat/internal/auth"
+	"github.com/Schenna43lp1/openchat/internal/store"
 )
 
 const (
@@ -24,6 +25,7 @@ const (
 type passwordView struct {
 	Username string
 	Forced   bool
+	History  store.IssueHistory
 	Error    string
 	Success  string
 }
@@ -31,7 +33,14 @@ type passwordView struct {
 // changePassword is the only page for an account that still has an issued password.
 func (s *server) changePassword(w http.ResponseWriter, r *http.Request) {
 	user := userFrom(r.Context())
-	view := passwordView{Username: user.Username, Forced: user.MustChangePassword}
+	history, err := s.Auth.IssueHistory(r.Context(), user)
+	if err != nil {
+		// An empty history would say that nothing happened.
+		s.Logger.Error("read issued passwords", "user", user.Username, "err", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	view := passwordView{Username: user.Username, Forced: user.MustChangePassword, History: history}
 	show := func(status int) {
 		s.render(w, status, "account", page{Title: "Passwort | Open chat", Description: "Passwort in Open chat aendern", Data: view})
 	}

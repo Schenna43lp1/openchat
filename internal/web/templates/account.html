@@ -18,6 +18,37 @@
       <p class="auth-success" role="status">{{.Success}}</p>
       {{end}}
 
+      {{if .History.Total}}
+      <section class="issue-history" aria-labelledby="issueHistoryTitle">
+        <h2 id="issueHistoryTitle">Vergebene Startpasswoerter</h2>
+        <p><strong>{{.History.Total}}-mal vergeben, {{.History.Redeemed}}-mal eingeloest.</strong>
+          Eingeloest heisst: Jemand hat damit ein eigenes Passwort gesetzt.</p>
+        <ol tabindex="0" aria-label="Vergebene Startpasswoerter, neueste zuerst">
+          {{range $index, $issue := .History.Latest}}
+          <li>
+            <time datetime="{{.At.UTC.Format "2006-01-02T15:04:05Z07:00"}}">{{.At.UTC.Format "02.01.2006 15:04"}} UTC</time>
+            {{if eq .Kind "operator"}}
+            <span>Passwort zurueckgesetzt durch den Betreiber</span>
+            {{else}}
+            <span>{{if eq .Kind "created"}}Konto angelegt{{else}}Passwort zurueckgesetzt{{end}} von Admin <strong>{{.By}}</strong></span>
+            {{end}}
+            {{if not .RedeemedAt.IsZero}}
+            <span class="issue-redeemed">eingeloest am {{.RedeemedAt.UTC.Format "02.01.2006 15:04"}} UTC</span>
+            {{else if and $.Forced (eq $index 0)}}
+            <span>noch nicht eingeloest, das ist dein aktuelles</span>
+            {{else}}
+            <span>nicht eingeloest</span>
+            {{end}}
+          </li>
+          {{end}}
+        </ol>
+        {{if gt .History.Total (len .History.Latest)}}
+        <p>Die {{len .History.Latest}} neuesten sind aufgelistet.</p>
+        {{end}}
+        <p class="issue-advice">Warst du das nicht oder hast du davon nichts gewusst? Dann melde dich beim Betreiber des Servers, nicht nur bei einem Admin.</p>
+      </section>
+      {{end}}
+
       <form class="auth-form" method="post" action="/account/password">
         <!-- Tells password managers which account the new password belongs to. -->
         <input type="text" name="username" value="{{.Username}}" autocomplete="username" readonly hidden>

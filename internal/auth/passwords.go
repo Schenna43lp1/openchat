@@ -161,6 +161,11 @@ func (s *Service) OperatorReset(ctx context.Context, username string) (Issued, e
 	return Issued{User: updated, Password: password}, nil
 }
 
+// IssueHistory is what the owner of the account gets to see about issued passwords.
+func (s *Service) IssueHistory(ctx context.Context, user store.User) (store.IssueHistory, error) {
+	return s.store.PasswordIssues(ctx, user.ID)
+}
+
 // FindID returns ErrUnknownUser for IDs without an account.
 func (s *Service) FindID(ctx context.Context, id int64) (store.User, error) {
 	user, err := s.store.UserByID(ctx, id)

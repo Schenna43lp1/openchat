@@ -126,6 +126,18 @@ select:focus {
   color: var(--accent-strong);
 }
 
+.account-notice {
+  display: block;
+  margin-top: 0.6rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  border-radius: 6px;
+  background: rgba(250, 204, 21, 0.08);
+  color: #fde68a;
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
 footer {
   display: grid;
   place-items: center;

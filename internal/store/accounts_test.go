@@ -66,8 +66,8 @@ func TestUpgradeFromSchema1(t *testing.T) {
 	}
 
 	s := openTest(t, path)
-	if got := schemaVersion(t.Context(), t, s); got != 2 {
-		t.Fatalf("schema version = %d, want 2", got)
+	if got := schemaVersion(t.Context(), t, s); got != 3 {
+		t.Fatalf("schema version = %d, want 3", got)
 	}
 	for name, only := range map[string]bool{"root": true, "former": true, "mod": false, "alice": false} {
 		u, err := s.UserByName(t.Context(), name)

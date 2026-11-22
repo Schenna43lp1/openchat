@@ -93,8 +93,13 @@ func (s *Store) CreateUserBy(ctx context.Context, actorID int64, u User, check f
 		if taken {
 			return ErrTaken
 		}
-		u.ID, err = insertUser(ctx, tx, u)
-		return err
+		if u.ID, err = insertUser(ctx, tx, u); err != nil {
+			return err
+		}
+		if !u.MustChangePassword {
+			return nil
+		}
+		return recordIssue(ctx, tx, u.ID, IssueCreated, actor.Username)
 	})
 	if refused != nil {
 		return User{}, refused

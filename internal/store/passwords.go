@@ -20,7 +20,8 @@ type PasswordChange struct {
 	Check func(actor, target User) error
 }
 
-// SetPassword replaces a password and ends all sessions of the account, in one transaction with the check.
+// SetPassword replaces a password, ends all sessions of the account and records issued passwords and their use,
+// all in one transaction with the check.
 // An error from Check is returned as it is.
 func (s *Store) SetPassword(ctx context.Context, change PasswordChange) (User, error) {
 	var updated User
@@ -43,6 +44,7 @@ func (s *Store) SetPassword(ctx context.Context, change PasswordChange) (User, e
 				return err
 			}
 		}
+		redeems := target.MustChangePassword && !change.MustChange
 		target.PasswordHash, target.MustChangePassword = change.Hash, change.MustChange
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE users SET password_hash = ?, must_change_password = ?, dm_visible_after_id = ? WHERE id = ?`,
@@ -50,6 +52,17 @@ func (s *Store) SetPassword(ctx context.Context, change PasswordChange) (User, e
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, target.ID); err != nil {
+			return err
+		}
+		switch {
+		case change.MustChange && change.ActorID == 0:
+			err = recordIssue(ctx, tx, target.ID, IssueOperator, "")
+		case change.MustChange:
+			err = recordIssue(ctx, tx, target.ID, IssueReset, actor.Username)
+		case redeems:
+			err = redeemIssue(ctx, tx, target.ID)
+		}
+		if err != nil {
 			return err
 		}
 		updated = target

@@ -72,6 +72,9 @@
         <a class="account-link" href="/admin/users">Benutzer verwalten</a>
         {{end}}
         <a class="account-link" href="/account/password">Passwort aendern</a>
+        {{with .LastIssue}}
+        <a class="account-notice" href="/account/password">Startpasswort vergeben am {{.At.UTC.Format "02.01.2006 15:04"}} UTC. Verlauf pruefen</a>
+        {{end}}
         <form method="post" action="/logout">
           <button type="submit" class="button-secondary">Logout</button>
         </form>

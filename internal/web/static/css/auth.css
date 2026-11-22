@@ -112,6 +112,49 @@
   user-select: all;
 }
 
+.issue-history {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  border-radius: 6px;
+  background: rgba(250, 204, 21, 0.08);
+  color: #fde68a;
+  font-size: 0.88rem;
+}
+
+.issue-history p {
+  margin: 0.4rem 0 0;
+}
+
+.issue-history ol {
+  max-height: 12rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.issue-history li {
+  display: grid;
+  padding: 0.4rem 0;
+  border-top: 1px solid rgba(250, 204, 21, 0.2);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.issue-history time {
+  color: var(--muted);
+}
+
+.issue-redeemed,
+.issue-advice {
+  font-weight: 700;
+}
+
+.issue-redeemed {
+  color: #fde68a;
+}
+
 .auth-footer {
   display: flex;
   align-items: center;
