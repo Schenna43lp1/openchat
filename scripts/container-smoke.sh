@@ -23,7 +23,7 @@ fail() {
 }
 
 start() {
-  docker run --detach --name "$name" --publish 127.0.0.1::8080 --volume "$volume:/app/data"     --env "OPENCHAT_USERS_FILE=$users_file" "$image" >/dev/null
+  docker run --detach --name "$name" --publish 127.0.0.1::8080 --volume "$volume:/app/data"     --env "OPENCHAT_USERS_FILE=$users_file" "$@" "$image" >/dev/null
   local address
   address="$(docker port "$name" 8080/tcp)" || fail "container exited during startup"
   base="http://$address"
@@ -40,8 +40,9 @@ sign_in() {
 
 for users_file in data/users.json data/users.sqlite; do
   cleanup
-  start
-  [ "$(sign_in register)" = 303 ] || fail "account was not created ($users_file)"
+  start --env OPENCHAT_ADMIN_USERNAME=smoke --env "OPENCHAT_ADMIN_PASSWORD=$password"
+  [ "$(sign_in register)" = 403 ] || fail "registration is open by default ($users_file)"
+  [ "$(sign_in login)" = 303 ] || fail "admin was not created ($users_file)"
   docker rm --force "$name" >/dev/null
 
   start

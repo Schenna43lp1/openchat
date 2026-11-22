@@ -67,7 +67,7 @@
 
 @media (max-width: 420px) {
   .auth-actions {
-    grid-template-columns: 1fr;
+    grid-auto-flow: row;
   }
 }
 

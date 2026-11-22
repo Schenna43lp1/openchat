@@ -35,6 +35,11 @@ type testApp struct {
 
 func startTestApp(t *testing.T, dir string) *testApp {
 	t.Helper()
+	return startTestAppWith(t, dir, config{allowRegistration: true})
+}
+
+func startTestAppWith(t *testing.T, dir string, cfg config) *testApp {
+	t.Helper()
 	parse := func(name string) *template.Template {
 		return template.Must(template.ParseFiles("templates/" + name + ".html"))
 	}
@@ -50,7 +55,7 @@ func startTestApp(t *testing.T, dir string) *testApp {
 		close(a.hubDone)
 	}()
 	tmpl := appTemplates{index: parse("index"), direct: parse("direct"), login: parse("login"), admin: parse("admin")}
-	a.server = httptest.NewServer(newRouter(tmpl, users, a.sessions, a.hub, l))
+	a.server = httptest.NewServer(newRouter(tmpl, users, a.sessions, a.hub, cfg, l))
 	t.Cleanup(a.stop)
 	return a
 }
@@ -100,6 +105,14 @@ func (a *testApp) signIn(mode, name string) string {
 	}
 	cookie, _, _ := strings.Cut(res.Header.Get("Set-Cookie"), ";")
 	return cookie
+}
+
+func (a *testApp) signInAdmin() string {
+	a.t.Helper()
+	if err := a.users.EnsureAdmin("admin", testPassword); err != nil {
+		a.t.Fatal(err)
+	}
+	return a.signIn("login", "admin")
 }
 
 // connect returns the socket and the history it was given.
@@ -299,7 +312,7 @@ func TestRevokedConnectionsAreClosed(t *testing.T) {
 	for name, revoke := range cases {
 		t.Run(name, func(t *testing.T) {
 			a := startTestApp(t, t.TempDir())
-			admin := a.signIn("register", "admin")
+			admin := a.signInAdmin()
 			victim := a.signIn("register", "victim")
 			first, _ := a.connect(victim)
 			second, _ := a.connect(victim)
@@ -323,7 +336,7 @@ func TestRevokedConnectionsAreClosed(t *testing.T) {
 
 func TestRevokedConnectionCannotSendOrReceive(t *testing.T) {
 	a := startTestApp(t, t.TempDir())
-	admin := a.signIn("register", "admin")
+	admin := a.signInAdmin()
 	victim := a.signIn("register", "victim")
 	adminConn, _ := a.connect(admin)
 	victimConn, _ := a.connect(victim)

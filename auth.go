@@ -50,6 +50,7 @@ var (
 	errUnknownUser        = errors.New("unknown user")
 	errLastAdmin          = errors.New("cannot change last admin")
 	errUserBanned         = errors.New("user is banned")
+	errAdminConflict      = errors.New("admin name belongs to an account with another password or a ban")
 	errSaveFailed         = errors.New("save users failed")
 	usernamePattern       = regexp.MustCompile(`^[A-Za-z0-9_.-]{3,32}$`)
 )
@@ -104,7 +105,7 @@ func isStaffRole(role UserRole) bool {
 	return role == RoleAdmin || role == RoleModerator
 }
 
-// NewUserStore initializes the selected backend, loads users, and guarantees at least one admin.
+// NewUserStore initializes the selected backend and loads users. It grants no roles.
 func NewUserStore(path string) (*UserStore, error) {
 	store := &UserStore{
 		path:   path,
@@ -115,10 +116,6 @@ func NewUserStore(path string) (*UserStore, error) {
 		return nil, err
 	}
 	if err := store.load(); err != nil {
-		_ = store.closeStorage()
-		return nil, err
-	}
-	if err := store.ensureAdmin(); err != nil {
 		_ = store.closeStorage()
 		return nil, err
 	}
@@ -133,7 +130,7 @@ func (s *UserStore) Register(username, password string) error {
 		logger.Printf("registration rejected: invalid username %q", username)
 		return errInvalidUsername
 	}
-	if utf8.RuneCountInString(password) < minPasswordRunes || len(password) > maxPasswordBytes {
+	if !validPassword(password) {
 		logger.Printf("registration rejected: invalid password length for %q", username)
 		return errInvalidPassword
 	}
@@ -153,10 +150,6 @@ func (s *UserStore) Register(username, password string) error {
 	}
 
 	role := RoleUser
-	if len(s.users) == 0 {
-		role = RoleAdmin
-	}
-
 	s.users[key] = authUser{
 		Username:     username,
 		PasswordHash: string(hash),
@@ -333,25 +326,55 @@ func (s *UserStore) loadJSON() error {
 	return nil
 }
 
-// ensureAdmin promotes the first user to admin if no admin exists yet.
-func (s *UserStore) ensureAdmin() error {
+// EnsureAdmin applies the operator's bootstrap credentials while no active admin exists.
+// An existing account is only promoted with its own password, so registering the name first gains nothing.
+func (s *UserStore) EnsureAdmin(username, password string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if len(s.users) == 0 || s.adminCountLocked() > 0 {
+	if s.activeAdminCountLocked() > 0 {
 		return nil
 	}
-
-	users := make([]authUser, 0, len(s.users))
-	for _, user := range s.users {
-		users = append(users, user)
+	username = normalizeAuthUsername(username)
+	if !validAuthUsername(username) {
+		return errInvalidUsername
 	}
-	sortUsers(users)
+	key := strings.ToLower(username)
+	account, exists := s.users[key]
+	if exists {
+		if account.Banned || bcrypt.CompareHashAndPassword([]byte(account.PasswordHash), []byte(password)) != nil {
+			return errAdminConflict
+		}
+	} else {
+		if !validPassword(password) {
+			return errInvalidPassword
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("hash password: %w", err)
+		}
+		account = authUser{Username: username, PasswordHash: string(hash), CreatedAt: time.Now().UTC().Format(time.RFC3339)}
+	}
 
-	first := users[0]
-	first.Role = RoleAdmin
-	s.users[strings.ToLower(first.Username)] = first
-	return s.saveLocked()
+	previous := account
+	account.Role = RoleAdmin
+	s.users[key] = account
+	if err := s.saveLocked(); err != nil {
+		if exists {
+			s.users[key] = previous
+		} else {
+			delete(s.users, key)
+		}
+		return err
+	}
+	return nil
+}
+
+// HasActiveAdmin reports whether anybody can manage this instance.
+func (s *UserStore) HasActiveAdmin() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.activeAdminCountLocked() > 0
 }
 
 func (s *UserStore) saveLocked() error {
@@ -620,16 +643,6 @@ func (m *SessionManager) Delete(token string) {
 	m.mu.Unlock()
 }
 
-func (s *UserStore) adminCountLocked() int {
-	count := 0
-	for _, user := range s.users {
-		if user.Role == RoleAdmin {
-			count++
-		}
-	}
-	return count
-}
-
 func (s *UserStore) activeAdminCountLocked() int {
 	count := 0
 	for _, user := range s.users {
@@ -640,7 +653,7 @@ func (s *UserStore) activeAdminCountLocked() int {
 	return count
 }
 
-func loginHandler(tmpl *template.Template, users *UserStore, sessions *SessionManager, logger *log.Logger) http.HandlerFunc {
+func loginHandler(page loginPage, users *UserStore, sessions *SessionManager, logger *log.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/login" {
 			http.NotFound(w, r)
@@ -654,9 +667,9 @@ func loginHandler(tmpl *template.Template, users *UserStore, sessions *SessionMa
 
 		switch r.Method {
 		case http.MethodGet:
-			renderLogin(w, tmpl, loginViewData{})
+			page.render(w, http.StatusOK, loginViewData{})
 		case http.MethodPost:
-			handleLoginPost(w, r, tmpl, users, sessions, logger)
+			handleLoginPost(w, r, page, users, sessions, logger)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -719,12 +732,18 @@ func authRequired(sessions *SessionManager, users *UserStore, next http.Handler)
 }
 
 type loginViewData struct {
-	Mode     string
-	Username string
-	Error    string
+	Mode              string
+	Username          string
+	Error             string
+	AllowRegistration bool
 }
 
-func handleLoginPost(w http.ResponseWriter, r *http.Request, tmpl *template.Template, users *UserStore, sessions *SessionManager, logger *log.Logger) {
+type loginPage struct {
+	tmpl              *template.Template
+	allowRegistration bool
+}
+
+func handleLoginPost(w http.ResponseWriter, r *http.Request, page loginPage, users *UserStore, sessions *SessionManager, logger *log.Logger) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -736,14 +755,18 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, tmpl *template.Temp
 
 	switch mode {
 	case "register":
+		if !page.allowRegistration {
+			page.render(w, http.StatusForbidden, loginViewData{Username: username, Error: "Die Registrierung ist geschlossen."})
+			return
+		}
 		if err := users.Register(username, password); err != nil {
-			renderLogin(w, tmpl, loginViewData{Mode: mode, Username: username, Error: authErrorMessage(err)})
+			page.render(w, http.StatusOK, loginViewData{Mode: mode, Username: username, Error: authErrorMessage(err)})
 			return
 		}
 	case "login", "":
 		user, err := users.Authenticate(username, password)
 		if err != nil {
-			renderLogin(w, tmpl, loginViewData{Mode: "login", Username: username, Error: authErrorMessage(err)})
+			page.render(w, http.StatusOK, loginViewData{Mode: "login", Username: username, Error: authErrorMessage(err)})
 			return
 		}
 		username = user.Username
@@ -762,12 +785,13 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, tmpl *template.Temp
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func renderLogin(w http.ResponseWriter, tmpl *template.Template, data loginViewData) {
+func (p loginPage) render(w http.ResponseWriter, status int, data loginViewData) {
 	if data.Mode == "" {
 		data.Mode = "login"
 	}
-	w.WriteHeader(http.StatusOK)
-	_ = tmpl.Execute(w, data)
+	data.AllowRegistration = p.allowRegistration
+	w.WriteHeader(status)
+	_ = p.tmpl.Execute(w, data)
 }
 
 func authErrorMessage(err error) string {
@@ -801,6 +825,10 @@ func normalizeAuthUsername(username string) string {
 
 func validAuthUsername(username string) bool {
 	return usernamePattern.MatchString(username)
+}
+
+func validPassword(password string) bool {
+	return utf8.RuneCountInString(password) >= minPasswordRunes && len(password) <= maxPasswordBytes
 }
 
 func validRole(role UserRole) bool {

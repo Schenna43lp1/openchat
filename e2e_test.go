@@ -34,6 +34,10 @@ func startE2EServer(t *testing.T, dir, usersFile string) *e2eServer {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Like an operator who leaves the bootstrap variables set across restarts.
+	if err := users.EnsureAdmin("admin", testPassword); err != nil {
+		t.Fatal(err)
+	}
 	l := log.New(io.Discard, "", 0)
 	hub := NewHubWithHistoryPath(l, filepath.Join(dir, "history.json"), users)
 	hubDone := make(chan struct{})
@@ -44,7 +48,7 @@ func startE2EServer(t *testing.T, dir, usersFile string) *e2eServer {
 
 	s := &e2eServer{}
 	// TLS is required: the cookie jar, like a browser, returns the Secure session cookie only over HTTPS.
-	s.Server = httptest.NewTLSServer(loggingMiddleware(l, newRouter(pages, users, NewSessionManager(), hub, l)))
+	s.Server = httptest.NewTLSServer(loggingMiddleware(l, newRouter(pages, users, NewSessionManager(), hub, config{allowRegistration: true}, l)))
 	stopped := false
 	s.stop = func() {
 		if stopped {
@@ -192,7 +196,11 @@ func TestEndToEnd(t *testing.T) {
 			name string
 			*browser
 		}{{"admin", admin}, {"alice", alice}, {"bob", bob}, {"mallory", mallory}} {
-			if page := account.signIn("register", account.name, "/"); !strings.Contains(page, account.name) {
+			mode := "register"
+			if account.name == "admin" {
+				mode = "login"
+			}
+			if page := account.signIn(mode, account.name, "/"); !strings.Contains(page, account.name) {
 				t.Fatalf("chat page does not show %q", account.name)
 			}
 		}

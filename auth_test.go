@@ -326,19 +326,6 @@ func TestLoadSanitizesStoredAccounts(t *testing.T) {
 	})
 }
 
-func TestStoreWithoutAdminRecoversOne(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, path string) {
-		store := openTestStore(t, path)
-		seedAccounts(t, store, testAccount(t, "member", RoleUser, false))
-		if err := store.Close(); err != nil {
-			t.Fatal(err)
-		}
-		if user, _ := openTestStore(t, path).Find("member"); user.Role != RoleAdmin {
-			t.Fatalf("role = %q, want admin", user.Role)
-		}
-	})
-}
-
 func TestEmptyJSONStore(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "users.json")
 	if err := os.WriteFile(path, []byte(" \n"), 0o600); err != nil {

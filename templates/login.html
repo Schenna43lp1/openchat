@@ -20,7 +20,7 @@
     <section class="auth-panel" aria-label="Anmeldung">
       <header class="auth-header">
         <h1>Open chat</h1>
-        <p>Melde dich an oder erstelle einen Account.</p>
+        <p>{{if .AllowRegistration}}Melde dich an oder erstelle einen Account.{{else}}Melde dich an. Die Registrierung ist geschlossen.{{end}}</p>
       </header>
 
       {{if .Error}}
@@ -41,7 +41,9 @@
         <!-- Two submit buttons share one form and switch mode via inline script below. -->
         <div class="auth-actions">
           <button type="submit" data-mode-submit="login">Einloggen</button>
+          {{if .AllowRegistration}}
           <button type="submit" class="button-secondary" data-mode-submit="register">Registrieren</button>
+          {{end}}
         </div>
       </form>
     </section>

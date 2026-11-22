@@ -55,6 +55,11 @@ func main() {
 		logger.Fatalf("parse admin template: %v", err)
 	}
 
+	cfg, err := loadConfig(os.Getenv)
+	if err != nil {
+		logger.Fatalf("configuration: %v", err)
+	}
+
 	for _, path := range []string{resolveUsersStorePath(), resolveChatHistoryPath()} {
 		if err := ensureWritable(path); err != nil {
 			logger.Fatalf("storage is not writable by uid %d (on Docker volumes, run chown -R 65532:65532 on the data directory): %v", os.Getuid(), err)
@@ -73,13 +78,21 @@ func main() {
 			logger.Printf("close user store: %v", err)
 		}
 	}()
+	if cfg.adminUsername != "" {
+		if err := users.EnsureAdmin(cfg.adminUsername, cfg.adminPassword); err != nil {
+			logger.Fatalf("create admin from %s: %v", envAdminUsername, err)
+		}
+	}
+	if !users.HasActiveAdmin() {
+		logger.Printf("no active admin: set %s and %s and restart", envAdminUsername, envAdminPassword)
+	}
 	sessions := NewSessionManager()
 
 	// Hub owns websocket clients and message fan-out.
 	hub := NewHub(logger, users)
 	go hub.Run()
 
-	mux := newRouter(appTemplates{index: tmpl, direct: directTmpl, login: loginTmpl, admin: adminTmpl}, users, sessions, hub, logger)
+	mux := newRouter(appTemplates{index: tmpl, direct: directTmpl, login: loginTmpl, admin: adminTmpl}, users, sessions, hub, cfg, logger)
 
 	server := &http.Server{
 		Addr:              defaultAddr,
@@ -102,14 +115,14 @@ type appTemplates struct {
 }
 
 // newRouter wires all routes with their access checks.
-func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *Hub, logger *log.Logger) *http.ServeMux {
+func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *Hub, cfg config, logger *log.Logger) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/", authRequired(sessions, users, indexHandler(t.index, logger)))
 	mux.Handle("/direct", authRequired(sessions, users, directHandler(t.direct, logger)))
 	mux.Handle("GET /session", authRequired(sessions, users, http.HandlerFunc(sessionCheckHandler)))
 	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, users, sessions, logger)))
 	mux.Handle("/admin/users", authRequired(sessions, users, staffRequired(adminUsersHandler(t.admin, users, logger))))
-	mux.HandleFunc("/login", loginHandler(t.login, users, sessions, logger))
+	mux.HandleFunc("/login", loginHandler(loginPage{tmpl: t.login, allowRegistration: cfg.allowRegistration}, users, sessions, logger))
 	mux.HandleFunc("/logout", logoutHandler(sessions))
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	return mux
