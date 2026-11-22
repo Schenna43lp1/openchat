@@ -19,8 +19,6 @@ FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 
 COPY --from=build /out/openchat /app/openchat
-COPY --from=build /src/templates /app/templates
-COPY --from=build /src/static /app/static
 # A new named volume inherits this owner (65532 = nonroot); distroless has no shell to chown later.
 COPY --from=build --chown=65532:65532 /out/data /app/data
 

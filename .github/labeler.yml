@@ -1,12 +1,12 @@
 backend:
   - changed-files:
-      - any-glob-to-any-file: "*.go"
+      - any-glob-to-any-file: "**/*.go"
 
 frontend:
   - changed-files:
       - any-glob-to-any-file:
-          - "static/**"
-          - "templates/**"
+          - "internal/web/static/**"
+          - "internal/web/templates/**"
 
 documentation:
   - changed-files:

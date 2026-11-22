@@ -1,5 +1,5 @@
 // Go module file for the Open chat application.
-module chat
+module github.com/Schenna43lp1/openchat
 
 go 1.26.0
 
