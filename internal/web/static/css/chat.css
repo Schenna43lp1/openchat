@@ -300,6 +300,8 @@ textarea {
 
 .sidebar {
   display: grid;
+  /* Otherwise the column grows to the longest name and pushes the sidebar out of the window. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   gap: 1rem;
 }

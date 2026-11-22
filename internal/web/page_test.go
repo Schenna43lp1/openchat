@@ -18,8 +18,10 @@ func TestRenderedPages(t *testing.T) {
 		want         []string
 	}{
 		{"/login", "", []string{"<title>Login | Open chat</title>", `name="password"`}},
-		{"/", admin, []string{"<title>Open chat</title>", `data-chat-scope="public"`, `id="splashScreen"`}},
-		{"/direct", admin, []string{"Direkt-Chat</h1>", `data-chat-scope="direct"`, `id="directTarget"`}},
+		{"/", admin, []string{"<title>Open chat</title>", `data-chat-scope="public"`, `id="splashScreen"`,
+			`aria-label="Nachricht an den oeffentlichen Chat"`}},
+		{"/direct", admin, []string{"Direkt-Chat</h1>", `data-chat-scope="direct"`, `id="directTarget"`,
+			`aria-label="Direktnachricht"`}},
 		{"/admin/users", admin, []string{"<title>Benutzer | Open chat</title>", `<option value="admin" selected>`}},
 	} {
 		res, body := a.send(http.MethodGet, tc.path, "", map[string]string{"Cookie": tc.cookie})

@@ -52,7 +52,8 @@
           </select>
           {{end}}
           <textarea id="messageInput" rows="1" maxlength="4096"
-            placeholder="{{if .Direct}}Direktnachricht schreiben...{{else}}Nachricht an den oeffentlichen Chat schreiben...{{end}}"
+            aria-label="{{if .Direct}}Direktnachricht{{else}}Nachricht an den oeffentlichen Chat{{end}}"
+            placeholder="{{if .Direct}}Direktnachricht schreiben{{else}}Nachricht schreiben{{end}}"
             autocomplete="off"></textarea>
         </div>
         <button type="submit">Senden</button>
