@@ -748,7 +748,6 @@ func authRequired(sessions *SessionManager, users *UserStore, next http.Handler)
 }
 
 type loginViewData struct {
-	Mode              string
 	Username          string
 	Error             string
 	AllowRegistration bool
@@ -781,7 +780,7 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, page loginPage, use
 			return
 		}
 		if err := users.Register(username, password); err != nil {
-			page.render(w, http.StatusOK, loginViewData{Mode: mode, Username: username, Error: authErrorMessage(err)})
+			page.render(w, http.StatusOK, loginViewData{Username: username, Error: authErrorMessage(err)})
 			return
 		}
 	case "login", "":
@@ -790,7 +789,7 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, page loginPage, use
 		}
 		user, err := users.Authenticate(username, password)
 		if err != nil {
-			page.render(w, http.StatusOK, loginViewData{Mode: "login", Username: username, Error: authErrorMessage(err)})
+			page.render(w, http.StatusOK, loginViewData{Username: username, Error: authErrorMessage(err)})
 			return
 		}
 		username = user.Username
@@ -810,9 +809,6 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, page loginPage, use
 }
 
 func (p loginPage) render(w http.ResponseWriter, status int, data loginViewData) {
-	if data.Mode == "" {
-		data.Mode = "login"
-	}
 	data.AllowRegistration = p.allowRegistration
 	w.WriteHeader(status)
 	_ = p.tmpl.Execute(w, data)

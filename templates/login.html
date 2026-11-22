@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Login | Open chat</title>
   <link rel="stylesheet" href="/static/style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <meta name="description" content="Login-Seite für Open chat">
   <meta name="author" content="Markus Stuefer">
   <meta name="robots" content="noindex">
@@ -28,8 +27,6 @@
       {{end}}
 
       <form class="auth-form" method="post" action="/login">
-        <input type="hidden" name="mode" id="authMode" value="{{.Mode}}">
-
         <label for="username">Benutzername</label>
         <input id="username" name="username" type="text" maxlength="32" pattern="[A-Za-z0-9_.-]{3,32}"
           autocomplete="username" value="{{.Username}}" required>
@@ -38,11 +35,11 @@
         <input id="password" name="password" type="password" minlength="8"
           autocomplete="current-password" required>
 
-        <!-- Two submit buttons share one form and switch mode via inline script below. -->
+        <!-- The clicked button sends the mode. Enter uses the first one, which is the login. -->
         <div class="auth-actions">
-          <button type="submit" data-mode-submit="login">Einloggen</button>
+          <button type="submit" name="mode" value="login">Einloggen</button>
           {{if .AllowRegistration}}
-          <button type="submit" class="button-secondary" data-mode-submit="register">Registrieren</button>
+          <button type="submit" class="button-secondary" name="mode" value="register">Registrieren</button>
           {{end}}
         </div>
       </form>
@@ -50,15 +47,6 @@
 
   </main>
 
-  <script>
-    document.querySelectorAll("[data-mode-submit]").forEach(function (button) {
-      button.addEventListener("click", function () {
-        document.getElementById("authMode").value = button.dataset.modeSubmit;
-        document.getElementById("password").autocomplete =
-          button.dataset.modeSubmit === "register" ? "new-password" : "current-password";
-      });
-    });
-  </script>
   <footer class="auth-footer">
     <p>Open chat &copy; 2026</p>
     <p>Made with ❤️ by <a href="https://markusstuefer.com">Markus Stuefer</a></p>

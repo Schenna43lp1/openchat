@@ -143,14 +143,17 @@ func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *
 		registrations:     newRateLimiter(registrationBurst, registrationInterval),
 	}, users, sessions, logger))
 	mux.HandleFunc("/logout", logoutHandler(sessions))
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-	return rejectCrossOrigin(http.MaxBytesHandler(mux, maxBodyBytes))
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(filesOnly{http.Dir("static")})))
+	protected, err := rejectCrossOrigin(http.MaxBytesHandler(mux, maxBodyBytes))
+	if err != nil {
+		return nil, err
+	}
+	return securityHeaders(protected), nil
 }
 
 // sessionCheckHandler answers behind authRequired. Browsers cannot read the status of a rejected
 // WebSocket handshake, so they ask here before they reconnect.
 func sessionCheckHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusNoContent)
 }
 

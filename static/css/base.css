@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap");
-
 /* Shared base styles and reusable UI elements. */
 * {
   box-sizing: border-box;
@@ -13,7 +11,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: Manrope, "Segoe UI", "Helvetica Neue", sans-serif;
+  font-family: system-ui, "Segoe UI", "Helvetica Neue", sans-serif;
   background:
     radial-gradient(75rem 45rem at 110% -10%, rgba(88, 214, 141, 0.08), transparent 60%),
     radial-gradient(65rem 38rem at -15% 100%, rgba(94, 165, 255, 0.12), transparent 60%),
@@ -61,7 +59,7 @@ h1,
 h2 {
   margin: 0;
   letter-spacing: 0.01em;
-  font-family: "Space Grotesk", Manrope, sans-serif;
+  font-family: inherit;
 }
 
 h1 {
