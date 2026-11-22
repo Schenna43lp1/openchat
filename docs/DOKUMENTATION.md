@@ -36,7 +36,7 @@ http://localhost:8080
 
 Regeln:
 
-- Erste Registrierung wird automatisch `admin`.
+- Den ersten `admin` legt der Betreiber per Umgebungsvariable an (siehe README).
 - Moderatoren dürfen keine Rollen ändern.
 - Moderatoren dürfen nur Nutzer mit Rolle `user` sperren.
 - Der letzte aktive Admin darf nicht herabgestuft/gesperrt werden.

@@ -35,7 +35,7 @@ Default:
 Override:
 
 ```powershell
-set OPENCHAT_USERS_FILE=data\users.sqlite
+$env:OPENCHAT_USERS_FILE = "data\users.sqlite"
 go run .
 ```
 
@@ -44,16 +44,38 @@ Dateiendungen:
 - `.json` -> JSON
 - `.db`, `.sqlite`, `.sqlite3` -> SQLite
 
-### WebSocket Origin-Whitelist
+### Origin-Whitelist (WebSocket und Formulare)
 
 Standard: gleiche Host-Origin wie der Request (`Origin` muss zu `Host` passen).
 
 Optional zusätzliche erlaubte Origins:
 
 ```powershell
-set OPENCHAT_ALLOWED_ORIGINS=https://chat.example.com,https://app.example.com
+$env:OPENCHAT_ALLOWED_ORIGINS = "https://chat.example.com,https://app.example.com"
 go run .
 ```
+
+### Erster Admin und Registrierung
+
+Die Registrierung ist standardmäßig geschlossen, und niemand wird automatisch Admin. Den ersten Admin legt der Betreiber beim Start fest:
+
+```powershell
+$env:OPENCHAT_ADMIN_USERNAME = "betreiber"
+$env:OPENCHAT_ADMIN_PASSWORD = "<mindestens 8 Zeichen>"
+go run .
+```
+
+Die beiden Variablen wirken nur, solange es keinen aktiven Admin gibt, und können danach entfernt werden. Existiert der Name schon, wird der Account nur mit seinem eigenen Passwort befördert.
+
+| Variable | Standard | Bedeutung |
+|---|---|---|
+| `OPENCHAT_ALLOW_REGISTRATION` | `false` | `true` öffnet die Selbstregistrierung |
+| `OPENCHAT_COOKIE_SECURE` | `true` | `false` nur für HTTP in einem vertrauenswürdigen LAN |
+| `OPENCHAT_TRUSTED_PROXIES` | leer | IPs oder Netze der Reverse Proxys, deren `X-Forwarded-For` gilt |
+
+Hinter einem Reverse Proxy `OPENCHAT_TRUSTED_PROXIES` setzen, sonst teilen sich alle Nutzer ein Login-Limit.
+
+**Upgrade von v1.0.3 oder älter:** Wer offene Registrierung braucht, muss `OPENCHAT_ALLOW_REGISTRATION=true` setzen. Bestehende Admins bleiben erhalten.
 
 ## Rollen
 
@@ -144,7 +166,7 @@ docker run -d --name openchat -p 8080:8080 -v openchat-data:/app/data ghcr.io/sc
 
 **5. Prüfen:** Mit einem bestehenden Account anmelden. `user store ready` im Log genügt nicht, das meldet der Server auch bei leerem Datenbestand. Das Backup erst danach löschen.
 
-Ohne gespeicherte Accounts wird die erste Registrierung Admin. Dann zuerst nur mit `-p 127.0.0.1:8080:8080` starten, den Admin anlegen und erst danach öffentlich freigeben.
+Ohne gespeicherte Accounts gibt es keinen Admin. Den Container dann mit `-e OPENCHAT_ADMIN_USERNAME=...` und `-e OPENCHAT_ADMIN_PASSWORD=...` starten.
 
 ## CI/CD & Security
 

@@ -25,7 +25,7 @@ docker run -d --name openchat -p 8080:8080 -v openchat-data:/app/data ghcr.io/sc
 
 1. Öffne `/login`
 2. Benutzername + Passwort eingeben
-3. Entweder **Einloggen** oder **Registrieren**
+3. **Einloggen**, oder **Registrieren**, falls der Betreiber die Registrierung geöffnet hat (siehe README)
 
 ## 3) Chat verwenden
 
