@@ -27,8 +27,7 @@ data/chat.db-wal
 data/chat.db-journal
 data/chat.db.lock
 data/chat.db-tmp
-
-
+.claude
 # Code coverage profiles and other test artifacts
 *.out
 coverage.*
