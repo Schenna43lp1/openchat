@@ -490,7 +490,7 @@ func TestLoginFlow(t *testing.T) {
 		{"banned", "login", "blocked", testPassword, http.StatusOK, "wurde gesperrt", ""},
 		{"taken name", "register", "alice", testPassword, http.StatusOK, "bereits vergeben", ""},
 		{"invalid name", "register", "no", testPassword, http.StatusOK, "3 bis 32 Zeichen", ""},
-		{"invalid password", "register", "newcomer", "short", http.StatusOK, "zwischen 8 und 128", ""},
+		{"invalid password", "register", "newcomer", "short", http.StatusOK, "mindestens 8 Zeichen", ""},
 		{"unknown mode", "reset", "alice", testPassword, http.StatusBadRequest, "bad request", ""},
 	}
 	for _, tc := range cases {

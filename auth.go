@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
@@ -27,6 +28,9 @@ const (
 	authCookieName  = "openchat_session"
 	sessionDuration = 24 * time.Hour
 	usersFile       = "data/users.json"
+
+	minPasswordRunes = 8
+	maxPasswordBytes = 72 // bcrypt does not accept more
 )
 
 type UserRole string
@@ -129,7 +133,7 @@ func (s *UserStore) Register(username, password string) error {
 		logger.Printf("registration rejected: invalid username %q", username)
 		return errInvalidUsername
 	}
-	if len(password) < 8 || len(password) > 128 {
+	if utf8.RuneCountInString(password) < minPasswordRunes || len(password) > maxPasswordBytes {
 		logger.Printf("registration rejected: invalid password length for %q", username)
 		return errInvalidPassword
 	}
@@ -767,7 +771,7 @@ func authErrorMessage(err error) string {
 	case errors.Is(err, errInvalidUsername):
 		return "Der Benutzername braucht 3 bis 32 Zeichen: Buchstaben, Zahlen, Punkt, Unterstrich oder Bindestrich."
 	case errors.Is(err, errInvalidPassword):
-		return "Das Passwort muss zwischen 8 und 128 Zeichen lang sein."
+		return "Das Passwort braucht mindestens 8 Zeichen und darf hoechstens 72 Byte lang sein (Umlaute zaehlen doppelt, Emojis vierfach)."
 	case errors.Is(err, errInvalidRole):
 		return "Diese Rolle ist nicht erlaubt."
 	case errors.Is(err, errUnknownUser):
@@ -778,8 +782,10 @@ func authErrorMessage(err error) string {
 		return "Die Aenderung konnte nicht gespeichert werden. Bitte versuche es spaeter erneut."
 	case errors.Is(err, errUserBanned):
 		return "Dieser Account wurde gesperrt."
-	default:
+	case errors.Is(err, errInvalidCredentials):
 		return "Benutzername oder Passwort ist falsch."
+	default:
+		return "Serverfehler. Bitte versuche es spaeter erneut."
 	}
 }
 
