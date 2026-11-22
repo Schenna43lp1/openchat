@@ -81,7 +81,7 @@ func New(options Options) (http.Handler, error) {
 	}
 	s.upgrader = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024, CheckOrigin: s.checkOrigin}
 
-	for _, name := range []string{"chat", "login", "admin", "account"} {
+	for _, name := range []string{"chat", "login", "admin", "account", "issue"} {
 		page, err := template.ParseFS(assets, "templates/layout.html", "templates/"+name+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse template %s: %w", name, err)
@@ -99,6 +99,8 @@ func New(options Options) (http.Handler, error) {
 	mux.Handle("GET /session", s.authRequired(http.HandlerFunc(sessionCheck)))
 	mux.Handle("/ws", s.authRequired(http.HandlerFunc(s.webSocket)))
 	mux.Handle("/admin/users", s.authRequired(staffRequired(http.HandlerFunc(s.adminUsers))))
+	mux.Handle("/admin/users/new", s.authRequired(adminRequired(http.HandlerFunc(s.newAccount))))
+	mux.Handle("/admin/users/{id}/password", s.authRequired(adminRequired(http.HandlerFunc(s.resetPassword))))
 	mux.Handle(passwordPath, s.authRequired(http.HandlerFunc(s.changePassword)))
 	mux.HandleFunc("/login", s.login)
 	mux.HandleFunc("/logout", s.logout)

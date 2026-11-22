@@ -41,10 +41,21 @@ func (g *loginGuard) admit(r *http.Request, name, passwordHash string) (allowed 
 	if isKnownDevice(r, name, passwordHash) {
 		limit = g.devices
 	}
-	sum := sha256.Sum256([]byte(strings.ToLower(name))) // the input can be 64 KiB long
-	key := string(sum[:])
+	key := guessKey(name)
 	allowed, wait = limit.allow(key)
 	return allowed, wait, func() { limit.refund(key) }
+}
+
+// forget clears both budgets of an account that got a new password.
+func (g *loginGuard) forget(name string) {
+	key := guessKey(name)
+	g.strangers.forget(key)
+	g.devices.forget(key)
+}
+
+func guessKey(name string) string {
+	sum := sha256.Sum256([]byte(strings.ToLower(name))) // the input can be 64 KiB long
+	return string(sum[:])
 }
 
 // deviceToken needs no storage: the password hash is a secret that only the server has.

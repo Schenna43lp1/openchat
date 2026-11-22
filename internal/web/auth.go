@@ -78,6 +78,16 @@ func staffRequired(next http.Handler) http.Handler {
 	})
 }
 
+func adminRequired(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if userFrom(r.Context()).Role != store.RoleAdmin {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 type loginView struct {
 	Username          string
 	Error             string
@@ -291,7 +301,7 @@ func errorMessage(err error) (message string, known bool) {
 	case errors.Is(err, auth.ErrOperatorOnly):
 		return "Das Passwort von Admins und frueheren Admins setzt nur der Betreiber auf dem Server zurueck.", true
 	case errors.Is(err, auth.ErrAccountChanged):
-		return "Das Konto wurde inzwischen geaendert. Bitte lade die Seite neu.", true
+		return "Das Konto wurde inzwischen geaendert. Bitte pruefe es und versuche es dann erneut.", true
 	case errors.Is(err, store.ErrSave):
 		return "Die Aenderung konnte nicht gespeichert werden. Bitte versuche es spaeter erneut.", false
 	default:

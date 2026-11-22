@@ -28,6 +28,12 @@
   color: var(--muted);
 }
 
+.admin-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
 .users-table {
   display: grid;
   overflow-x: auto;
@@ -81,6 +87,17 @@
   color: var(--accent);
   font-size: 0.76rem;
   font-weight: 800;
+}
+
+.status-badge-pending {
+  border-color: rgba(250, 204, 21, 0.45);
+  background: rgba(250, 204, 21, 0.1);
+  color: #fde68a;
+}
+
+.users-reset {
+  font-size: 0.85rem;
+  text-align: center;
 }
 
 .status-badge-banned {

@@ -45,6 +45,13 @@ func (l *rateLimiter) allow(key string) (bool, time.Duration) {
 	return true, 0
 }
 
+// forget gives key its full budget again.
+func (l *rateLimiter) forget(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.next, key)
+}
+
 // refund gives back one event that turned out to be harmless.
 func (l *rateLimiter) refund(key string) {
 	l.mu.Lock()
