@@ -51,10 +51,13 @@ func newFixture(t *testing.T) *fixture {
 	return f
 }
 
-// connect registers a client without a socket.
+// connect registers a client without a socket and returns once it has its history.
 func (f *fixture) connect(name string, buffer int) *client {
 	c := &client{hub: f.hub, user: f.users[name], send: make(chan Event, buffer)}
 	f.hub.register <- c
+	// The hub takes c before it reads the history, and a message stored meanwhile would land in there.
+	// It accepts the next event only when it is done, and ignores notices for unknown clients.
+	f.hub.notices <- notice{client: &client{}}
 	return c
 }
 
