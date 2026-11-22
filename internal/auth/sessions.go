@@ -16,6 +16,8 @@ import (
 // SessionDuration is how long a login lasts.
 const SessionDuration = 24 * time.Hour
 
+const revokeTimeout = 5 * time.Second
+
 // ErrNoSession means that a token is unknown or expired.
 var ErrNoSession = errors.New("no valid session")
 
@@ -58,11 +60,12 @@ func (s *Service) Session(ctx context.Context, token string) (store.User, error)
 
 // EndSession also revokes the connections that belong to the token.
 func (s *Service) EndSession(ctx context.Context, token string) error {
-	if err := s.store.DeleteSession(ctx, hashToken(token)); err != nil {
-		return err
-	}
-	s.revision.Add(1)
-	return nil
+	// Also on errors: SQLite can report one for a DELETE that happened. Checking again is harmless.
+	defer s.revision.Add(1)
+	// A browser that disconnects must not interrupt its own logout.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), revokeTimeout)
+	defer cancel()
+	return s.store.DeleteSession(ctx, hashToken(token))
 }
 
 // RemoveExpiredSessions is for periodic cleanup.
