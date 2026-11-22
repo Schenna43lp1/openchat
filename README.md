@@ -75,6 +75,10 @@ Die beiden Variablen wirken nur, solange es keinen aktiven Admin gibt, und könn
 
 Hinter einem Reverse Proxy `OPENCHAT_TRUSTED_PROXIES` setzen, sonst teilen sich alle Nutzer ein Login-Limit.
 
+Fehlgeschlagene Logins sind zusätzlich je Account begrenzt: 20, danach einer alle 5 Minuten. Ein Browser, der sich schon einmal angemeldet hat, hat dafür ein eigenes Budget, damit Fremde den Besitzer nicht aussperren. Während eines Angriffs kann eine Anmeldung von einem neuen Browser warten müssen. Ein Neustart setzt die Budgets zurück.
+
+Ein Account kann höchstens 10 Chat-Verbindungen (Tabs, Geräte) gleichzeitig offen haben.
+
 **Upgrade von v1.0.3 oder älter:** Wer offene Registrierung braucht, muss `OPENCHAT_ALLOW_REGISTRATION=true` setzen. Bestehende Admins bleiben erhalten.
 
 ## Rollen

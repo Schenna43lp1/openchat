@@ -752,6 +752,7 @@ type loginPage struct {
 	allowRegistration bool
 	trustedProxies    []netip.Prefix
 	logins            *rateLimiter
+	guard             *loginGuard
 	registrations     *rateLimiter
 }
 
@@ -781,11 +782,21 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, page loginPage, use
 		if !page.admit(w, r, page.logins, username) {
 			return
 		}
+		name, hash := username, ""
+		if account, ok := users.Find(username); ok {
+			name, hash = account.Username, account.PasswordHash
+		}
+		allowed, wait, succeeded := page.guard.admit(r, name, hash)
+		if !allowed {
+			page.tooMany(w, username, wait)
+			return
+		}
 		user, err := users.Authenticate(username, password)
 		if err != nil {
 			page.render(w, http.StatusOK, loginViewData{Username: username, Error: authErrorMessage(err)})
 			return
 		}
+		succeeded()
 		username = user.Username
 	default:
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -798,6 +809,9 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, page loginPage, use
 		return
 	}
 
+	if account, ok := users.Find(username); ok {
+		rememberDevice(w, account.Username, account.PasswordHash, !sessions.insecureCookie)
+	}
 	logger.Debug("signed in", "user", username, "mode", mode)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -814,9 +828,17 @@ func (p loginPage) admit(w http.ResponseWriter, r *http.Request, limit *rateLimi
 	if allowed {
 		return true
 	}
-	w.Header().Set("Retry-After", strconv.Itoa(int(wait/time.Second)+1))
-	p.render(w, http.StatusTooManyRequests, loginViewData{Username: username, Error: "Zu viele Versuche. Bitte warte kurz."})
+	p.tooMany(w, username, wait)
 	return false
+}
+
+func (p loginPage) tooMany(w http.ResponseWriter, username string, wait time.Duration) {
+	w.Header().Set("Retry-After", strconv.Itoa(int(wait/time.Second)+1))
+	message := "Zu viele Versuche. Bitte warte kurz."
+	if wait >= time.Minute {
+		message = fmt.Sprintf("Zu viele Versuche. Bitte versuche es in %d Minuten erneut.", int(wait/time.Minute)+1)
+	}
+	p.render(w, http.StatusTooManyRequests, loginViewData{Username: username, Error: message})
 }
 
 func parseForm(w http.ResponseWriter, r *http.Request) bool {

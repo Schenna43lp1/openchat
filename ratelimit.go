@@ -45,3 +45,12 @@ func (l *rateLimiter) allow(key string) (bool, time.Duration) {
 	l.next[key] = next.Add(l.interval)
 	return true, 0
 }
+
+// refund gives back one event that turned out to be harmless.
+func (l *rateLimiter) refund(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if next, ok := l.next[key]; ok {
+		l.next[key] = next.Add(-l.interval)
+	}
+}

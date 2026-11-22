@@ -462,6 +462,17 @@ func TestSessionLookup(t *testing.T) {
 	}
 }
 
+// sessionCookies leaves out the cookie that recognizes the browser.
+func sessionCookies(res *http.Response) []*http.Cookie {
+	var found []*http.Cookie
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == authCookieName {
+			found = append(found, cookie)
+		}
+	}
+	return found
+}
+
 func TestLoginFlow(t *testing.T) {
 	cases := []struct {
 		name, mode, username, password string
@@ -488,7 +499,7 @@ func TestLoginFlow(t *testing.T) {
 			if res.StatusCode != tc.status || !strings.Contains(body, tc.message) {
 				t.Fatalf("status = %d, body = %s", res.StatusCode, body)
 			}
-			cookies := res.Cookies()
+			cookies := sessionCookies(res)
 			if tc.user == "" {
 				if len(cookies) != 0 {
 					t.Fatal("rejected request received a cookie")

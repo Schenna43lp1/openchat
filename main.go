@@ -150,6 +150,7 @@ func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *
 		allowRegistration: cfg.allowRegistration,
 		trustedProxies:    cfg.trustedProxies,
 		logins:            newRateLimiter(loginBurst, loginInterval),
+		guard:             newLoginGuard(),
 		registrations:     newRateLimiter(registrationBurst, registrationInterval),
 	}, users, sessions, logger))
 	mux.HandleFunc("/logout", logoutHandler(sessions))
