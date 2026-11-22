@@ -36,18 +36,28 @@ type User struct {
 	Role         Role
 	Banned       bool
 	CreatedAt    time.Time
+
+	// MustChangePassword is set while the password is one that somebody else has seen.
+	MustChangePassword bool
+	// OperatorResetOnly is set once an account is admin and stays.
+	OperatorResetOnly bool
+	// DMVisibleAfterID hides direct messages up to this ID from this account.
+	DMVisibleAfterID int64
 }
 
-const userColumns = `users.id, users.username, users.password_hash, users.role, users.banned, coalesce(users.created_at, 0)`
+const userColumns = `users.id, users.username, users.password_hash, users.role, users.banned, coalesce(users.created_at, 0),
+	users.must_change_password, users.operator_reset_only, users.dm_visible_after_id`
 
 type row interface {
 	Scan(dest ...any) error
 }
 
-func scanUser(r row) (User, error) {
+// scanUser reads userColumns, followed by the columns that go to extra.
+func scanUser(r row, extra ...any) (User, error) {
 	var u User
 	var created int64
-	err := r.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.Banned, &created)
+	err := r.Scan(append([]any{&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.Banned, &created,
+		&u.MustChangePassword, &u.OperatorResetOnly, &u.DMVisibleAfterID}, extra...)...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -60,7 +70,22 @@ func scanUser(r row) (User, error) {
 
 // CreateUser adds an account and returns it with its ID.
 func (s *Store) CreateUser(ctx context.Context, u User) (User, error) {
+	return s.CreateUserBy(ctx, 0, u, func(User) error { return nil })
+}
+
+// CreateUserBy is CreateUser for another account: check sees the actor inside the transaction and may refuse.
+// An error from check is returned as it is.
+func (s *Store) CreateUserBy(ctx context.Context, actorID int64, u User, check func(actor User) error) (User, error) {
+	u.OperatorResetOnly = u.OperatorResetOnly || u.Role == RoleAdmin
+	var refused error
 	err := inTx(ctx, s.db, func(tx *sql.Tx) error {
+		actor, err := actorByID(ctx, tx, actorID)
+		if err != nil {
+			return err
+		}
+		if refused = check(actor); refused != nil {
+			return refused
+		}
 		var taken bool
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE username = ?)`, u.Username).Scan(&taken); err != nil {
 			return err
@@ -68,11 +93,13 @@ func (s *Store) CreateUser(ctx context.Context, u User) (User, error) {
 		if taken {
 			return ErrTaken
 		}
-		var err error
 		u.ID, err = insertUser(ctx, tx, u)
 		return err
 	})
-	if errors.Is(err, ErrTaken) {
+	if refused != nil {
+		return User{}, refused
+	}
+	if errors.Is(err, ErrTaken) || errors.Is(err, ErrNotFound) {
 		return User{}, err
 	}
 	if err != nil {
@@ -83,8 +110,12 @@ func (s *Store) CreateUser(ctx context.Context, u User) (User, error) {
 
 func insertUser(ctx context.Context, tx *sql.Tx, u User) (int64, error) {
 	result, err := tx.ExecContext(ctx,
-		`INSERT INTO users (username, password_hash, role, banned, created_at) VALUES (?, ?, ?, ?, ?)`,
-		u.Username, u.PasswordHash, u.Role, u.Banned, toMillis(u.CreatedAt))
+		`INSERT INTO users (username, password_hash, role, banned, created_at,
+		                    must_change_password, operator_reset_only, dm_visible_after_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Username, u.PasswordHash, u.Role, u.Banned, toMillis(u.CreatedAt),
+		// Also here, because the import from v1.0.x does not go through CreateUserBy.
+		u.MustChangePassword, u.OperatorResetOnly || u.Role == RoleAdmin, u.DMVisibleAfterID)
 	if err != nil {
 		return 0, err
 	}
@@ -94,6 +125,17 @@ func insertUser(ctx context.Context, tx *sql.Tx, u User) (int64, error) {
 // UserByName ignores the case of ASCII letters, the only ones valid in names.
 func (s *Store) UserByName(ctx context.Context, name string) (User, error) {
 	return scanUser(s.db.QueryRowContext(ctx, `SELECT `+userColumns+` FROM users WHERE username = ?`, name))
+}
+
+// UserByID returns ErrNotFound for IDs without an account.
+func (s *Store) UserByID(ctx context.Context, id int64) (User, error) {
+	return scanUser(s.db.QueryRowContext(ctx, userByIDQuery, id))
+}
+
+const userByIDQuery = `SELECT ` + userColumns + ` FROM users WHERE id = ?`
+
+func userByID(ctx context.Context, tx *sql.Tx, id int64) (User, error) {
+	return scanUser(tx.QueryRowContext(ctx, userByIDQuery, id))
 }
 
 // Users lists all accounts by name.
@@ -148,7 +190,9 @@ func (s *Store) UpdateUser(ctx context.Context, name string, change func(u *User
 		if refused = change(&after, admins); refused != nil {
 			return refused
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE users SET role = ?, banned = ? WHERE id = ?`, after.Role, after.Banned, before.ID); err != nil {
+		after.OperatorResetOnly = before.OperatorResetOnly || before.Role == RoleAdmin || after.Role == RoleAdmin
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET role = ?, banned = ?, operator_reset_only = ? WHERE id = ?`,
+			after.Role, after.Banned, after.OperatorResetOnly, before.ID); err != nil {
 			return err
 		}
 		if after.Banned && !before.Banned {

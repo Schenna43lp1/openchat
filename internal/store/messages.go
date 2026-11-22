@@ -74,7 +74,7 @@ func insertMessage(ctx context.Context, tx *sql.Tx, m Message) (int64, error) {
 }
 
 // History returns what userID may read, oldest first: the newest public messages and the newest
-// direct messages of that account. Neither kind can displace the other.
+// direct messages of that account, without those that a reset hid from it. Neither kind can displace the other.
 func (s *Store) History(ctx context.Context, userID int64) ([]Message, error) {
 	const columns = `id, kind, coalesce(sender_id, 0) AS sender_id, sender_name,
 		coalesce(recipient_id, 0) AS recipient_id, recipient_name, body, created_at`
@@ -83,9 +83,10 @@ func (s *Store) History(ctx context.Context, userID int64) ([]Message, error) {
 		 UNION ALL
 		 SELECT * FROM (SELECT `+columns+` FROM messages
 		                 WHERE kind = 'direct' AND (messages.sender_id = ? OR messages.recipient_id = ?)
+		                   AND messages.id > coalesce((SELECT dm_visible_after_id FROM users WHERE users.id = ?), 0)
 		                 ORDER BY id DESC LIMIT ?)
 		 ORDER BY id`,
-		HistoryLimit, userID, userID, HistoryLimit)
+		HistoryLimit, userID, userID, userID, HistoryLimit)
 	if err != nil {
 		return nil, fmt.Errorf("read history: %w", err)
 	}

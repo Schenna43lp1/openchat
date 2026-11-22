@@ -126,7 +126,7 @@ func TestImportLegacy(t *testing.T) {
 			for _, u := range all {
 				users[u.Username] = u
 			}
-			if u := users["Root"]; u.Role != RoleAdmin || u.PasswordHash != "hash-root" || u.CreatedAt.UnixMilli() != created {
+			if u := users["Root"]; u.Role != RoleAdmin || !u.OperatorResetOnly || u.PasswordHash != "hash-root" || u.CreatedAt.UnixMilli() != created {
 				t.Errorf("Root = %+v", u)
 			}
 			if u := users["alice"]; u.Role != RoleModerator {
