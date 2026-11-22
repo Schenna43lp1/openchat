@@ -3,6 +3,9 @@ module chat
 
 go 1.26.0
 
+// CI reads this line; keep it on the latest patch release so govulncheck stays meaningful.
+toolchain go1.27.4
+
 require github.com/gorilla/websocket v1.5.3
 
 require (

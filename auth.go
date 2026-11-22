@@ -708,19 +708,6 @@ func authRequired(sessions *SessionManager, users *UserStore, next http.Handler)
 	})
 }
 
-// adminRequired restricts routes to admin role only.
-func adminRequired(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, ok := r.Context().Value(currentUserContextKey).(currentUser)
-		if !ok || user.Role != RoleAdmin {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
 type loginViewData struct {
 	Mode     string
 	Username string

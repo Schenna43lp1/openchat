@@ -6,12 +6,8 @@ on:
       - dev
       - main
       - "release/**"
-
-  pull_request:
-    branches:
-      - dev
-      - main
-      - "release/**"
+    tags:
+      - "v*.*.*"
 
   workflow_dispatch:
 
@@ -20,7 +16,14 @@ env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 jobs:
+  ci:
+    name: CI
+    permissions:
+      contents: read
+    uses: ./.github/workflows/CI.yml
+
   build:
+    needs: ci
     name: Build Docker Image
     runs-on: ubuntu-latest
 
@@ -31,15 +34,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      # GHCR login is only required when pushing an image.
       - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -47,9 +48,11 @@ jobs:
 
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.IMAGE_NAME }}
+          # A tag of an older release line must never move latest.
+          flavor: latest=false
           tags: |
             # main/default branch
             type=raw,value=latest,enable={{is_default_branch}}
@@ -63,15 +66,16 @@ jobs:
             # Immutable commit tag
             type=sha,prefix=sha-
 
-            # PR tag
-            type=ref,event=pr
+            # Release tags
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ./Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
