@@ -245,8 +245,7 @@ func TestAccountRules(t *testing.T) {
 	before := list(t, s)
 
 	ban := func(actor store.User, name string) error {
-		_, err := s.ToggleBan(t.Context(), actor, name)
-		return err
+		return s.SetBanned(t.Context(), actor, name, true)
 	}
 	for name, tc := range map[string]struct{ got, want error }{
 		"invalid role":            {s.SetRole(t.Context(), root, "user", "owner"), ErrInvalidRole},
@@ -273,11 +272,13 @@ func TestAccountRules(t *testing.T) {
 	if err := s.SetRole(t.Context(), root, "former", store.RoleUser); err != nil {
 		t.Errorf("demotion of a banned admin: %v", err)
 	}
-	if banned, err := s.ToggleBan(t.Context(), moderator, "user"); err != nil || !banned {
-		t.Errorf("ban = %t, %v", banned, err)
-	}
-	if banned, err := s.ToggleBan(t.Context(), moderator, "user"); err != nil || banned {
-		t.Errorf("unban = %t, %v", banned, err)
+	for _, banned := range []bool{true, true, false, false} {
+		if err := s.SetBanned(t.Context(), moderator, "user", banned); err != nil {
+			t.Errorf("banned = %t: %v", banned, err)
+		}
+		if u, err := s.Find(t.Context(), "user"); err != nil || u.Banned != banned {
+			t.Errorf("after banned = %t: %+v, %v", banned, u, err)
+		}
 	}
 }
 
@@ -386,7 +387,7 @@ func TestWatch(t *testing.T) {
 	}
 	expect("after logout", onLaptop, false)
 	expect("other session after logout", onPhone, true)
-	if _, err := s.ToggleBan(t.Context(), operator, "alice"); err != nil {
+	if err := s.SetBanned(t.Context(), operator, "alice", true); err != nil {
 		t.Fatal(err)
 	}
 	expect("after ban", onPhone, false)

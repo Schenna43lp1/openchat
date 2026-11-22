@@ -1,7 +1,6 @@
 package web
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -53,22 +52,11 @@ func (s *server) resetPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// The ID, not the name: request paths are logged.
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		http.NotFound(w, r)
+	target, ok := s.targetUser(w, r)
+	if !ok {
 		return
 	}
-	target, err := s.Auth.FindID(r.Context(), id)
-	if errors.Is(err, auth.ErrUnknownUser) {
-		http.NotFound(w, r)
-		return
-	}
-	if err != nil {
-		s.Logger.Error("read account", "id", id, "err", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
+	id := target.ID
 
 	admin := userFrom(r.Context())
 	view := issueView{Admin: admin.Username, Target: &target, State: auth.ResetState(target)}

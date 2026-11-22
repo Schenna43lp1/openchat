@@ -22,7 +22,8 @@ func TestRenderedPages(t *testing.T) {
 			`aria-label="Nachricht an den oeffentlichen Chat"`}},
 		{"/direct", admin, []string{"Direkt-Chat</h1>", `data-chat-scope="direct"`, `id="directTarget"`,
 			`aria-label="Direktnachricht"`}},
-		{"/admin/users", admin, []string{"<title>Benutzer | Open chat</title>", `<option value="admin" selected>`}},
+		{"/admin/users", admin, []string{"<title>Benutzer | Open chat</title>", `data-user="admin"`}},
+		{userPath(a.account("admin")), admin, []string{"<title>Konto verwalten | Open chat</title>", `value="admin" checked`}},
 	} {
 		res, body := a.send(http.MethodGet, tc.path, "", map[string]string{"Cookie": tc.cookie})
 		if res.StatusCode != http.StatusOK {

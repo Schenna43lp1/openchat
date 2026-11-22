@@ -13,7 +13,7 @@ func TestBanDuringLoginLeavesNoSession(t *testing.T) {
 	compare := s.compare
 	s.compare = func(hash, password []byte) error {
 		// After the account was read, before the session is written.
-		if _, err := s.ToggleBan(t.Context(), operator, "victim"); err != nil {
+		if err := s.SetBanned(t.Context(), operator, "victim", true); err != nil {
 			t.Fatal(err)
 		}
 		return compare(hash, password)

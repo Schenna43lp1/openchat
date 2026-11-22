@@ -1,82 +1,64 @@
 {{define "content"}}
   <main class="admin-shell">
-    <section class="admin-panel" aria-label="Benutzerverwaltung">
+    <div class="admin-panel">
       <header class="admin-header">
-        <div>
+        <div class="admin-title">
           <h1>Benutzer</h1>
           <p>Angemeldet als <strong>{{.CurrentUser.Username}}</strong></p>
         </div>
         <div class="admin-links">
-          {{if .CanChangeRoles}}
-          <a class="text-link" href="/admin/users/new">Konto anlegen</a>
+          {{if .CanCreate}}
+          <a class="admin-button" href="/admin/users/new">Konto anlegen</a>
           {{end}}
-          <a class="text-link" href="/">Zurueck zum Chat</a>
+          <a class="admin-button button-secondary" href="/">Zurueck zum Chat</a>
         </div>
       </header>
 
-      {{if .Error}}
-      <p class="auth-error" role="alert">{{.Error}}</p>
-      {{end}}
-
-      {{if .Success}}
-      <p class="auth-success" role="status">{{.Success}}</p>
-      {{end}}
-
-      <!-- User management table: role changes for admins, ban toggles for staff. -->
-      <div class="users-table" role="table" aria-label="Benutzerrollen und Sperren">
-        <div class="users-row users-row-head" role="row">
-          <span role="columnheader">Name</span>
-          <span role="columnheader">Rolle</span>
-          <span role="columnheader">Status</span>
-          <span role="columnheader">Erstellt</span>
-          <span role="columnheader">Aktionen</span>
-        </div>
-
-        {{range .Users}}
-        <form class="users-row" method="post" action="/admin/users" role="row">
-          <span role="cell">{{.Username}}</span>
-          <span role="cell">
-            <input type="hidden" name="username" value="{{.Username}}">
-            {{if $.CanChangeRoles}}
-            <select name="role" aria-label="Rolle fuer {{.Username}}">
-              {{$role := .Role}}
-              {{range $.Roles}}
-              <option value="{{.}}" {{if eq . $role}}selected{{end}}>{{.}}</option>
-              {{end}}
-            </select>
-            {{else}}
-            <span class="role-badge">{{.Role}}</span>
-            {{end}}
-          </span>
-          <span role="cell">
-            {{if .Banned}}
-            <span class="status-badge status-badge-banned">gesperrt</span>
-            {{else}}
-            <span class="status-badge">aktiv</span>
-            {{end}}
-            {{if .MustChangePassword}}
-            <span class="status-badge status-badge-pending">Startpasswort</span>
-            {{end}}
-          </span>
-          <span role="cell">{{if not .CreatedAt.IsZero}}{{.CreatedAt.UTC.Format "2006-01-02T15:04:05Z07:00"}}{{end}}</span>
-          <span role="cell">
-            <div class="users-actions">
-              {{if $.CanChangeRoles}}
-              <button type="submit" name="action" value="set_role">Rolle speichern</button>
-              {{end}}
-              {{if .Banned}}
-              <button type="submit" class="button-secondary" name="action" value="toggle_ban">Entsperren</button>
-              {{else}}
-              <button type="submit" class="button-secondary" name="action" value="toggle_ban">Sperren</button>
-              {{end}}
-              {{if and $.CanChangeRoles (not .OperatorResetOnly)}}
-              <a class="text-link users-reset" href="/admin/users/{{.ID}}/password">Passwort zuruecksetzen</a>
-              {{end}}
-            </div>
-          </span>
+      <div class="users-tools">
+        <form class="users-search" method="get" action="/admin/users" role="search">
+          {{if .Filter}}<input type="hidden" name="filter" value="{{.Filter}}">{{end}}
+          <input id="userSearch" name="q" type="search" maxlength="32" value="{{.Query}}"
+            aria-label="Benutzername suchen" placeholder="Benutzername suchen" autocomplete="off">
+          <button type="submit" class="admin-button button-secondary">Suchen</button>
         </form>
-        {{end}}
+        <nav class="users-filters" aria-label="Filter">
+          {{range .Filters}}
+          <a class="users-filter" href="{{.URL}}" {{if .Active}}aria-current="true"{{end}}>{{.Label}} <span>{{.Count}}</span></a>
+          {{end}}
+        </nav>
       </div>
-    </section>
+
+      {{if .Users}}
+      <ul class="users-list">
+        {{range .Users}}
+        <li>
+          <a class="user-row" href="/admin/users/{{.ID}}" data-user="{{.Username}}">
+            <span class="user-name">{{.Username}}{{if eq .ID $.CurrentUser.ID}} <span class="status-badge status-badge-self">du</span>{{end}}</span>
+            <span class="user-tags">
+              <span class="role-badge">{{.Role}}</span>
+              {{if .Banned}}<span class="status-badge status-badge-banned">gesperrt</span>{{end}}
+              {{if .MustChangePassword}}<span class="status-badge status-badge-pending">Startpasswort offen</span>{{end}}
+              {{if not (or .Banned .MustChangePassword)}}<span class="status-badge">aktiv</span>{{end}}
+            </span>
+            <span class="user-created">
+              {{if not .CreatedAt.IsZero}}<time data-local="date" datetime="{{.CreatedAt.UTC.Format "2006-01-02T15:04:05Z07:00"}}">{{.CreatedAt.UTC.Format "02.01.2006 15:04"}} UTC</time>{{end}}
+            </span>
+            <span class="user-open" aria-hidden="true">&rsaquo;</span>
+          </a>
+        </li>
+        {{end}}
+      </ul>
+      {{else}}
+      <p class="users-empty">Keine Benutzer gefunden. <a class="text-link" href="/admin/users">Suche und Filter zuruecksetzen</a></p>
+      {{end}}
+
+      {{if gt .Pages 1}}
+      <nav class="users-pages" aria-label="Seiten">
+        {{if .Previous}}<a class="admin-button button-secondary" href="{{.Previous}}" rel="prev">Zurueck</a>{{else}}<span></span>{{end}}
+        <span>Seite {{.Page}} von {{.Pages}}</span>
+        {{if .Next}}<a class="admin-button button-secondary" href="{{.Next}}" rel="next">Weiter</a>{{else}}<span></span>{{end}}
+      </nav>
+      {{end}}
+    </div>
   </main>
 {{end}}

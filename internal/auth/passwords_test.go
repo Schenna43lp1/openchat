@@ -247,8 +247,7 @@ func TestResetChecksAgainInsideTheTransaction(t *testing.T) {
 			return s.SetRole(ctx, operator, "admin", store.RoleUser)
 		}, ErrForbidden},
 		"admin banned": {func(ctx context.Context, s *Service, _ store.User) error {
-			_, err := s.ToggleBan(ctx, operator, "admin")
-			return err
+			return s.SetBanned(ctx, operator, "admin", true)
 		}, ErrForbidden},
 		"admin reset": {func(ctx context.Context, s *Service, _ store.User) error {
 			_, err := s.OperatorReset(ctx, "admin")

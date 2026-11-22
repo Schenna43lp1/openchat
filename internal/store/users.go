@@ -180,9 +180,18 @@ const activeAdminsQuery = `SELECT count(*) FROM users WHERE role = 'admin' AND b
 // so rules like "keep one admin" hold under concurrency. A ban also ends the sessions of the account.
 // An error from change is returned as it is.
 func (s *Store) UpdateUser(ctx context.Context, name string, change func(u *User, activeAdmins int) error) (before, after User, err error) {
+	return s.UpdateUserBy(ctx, 0, name, func(_ User, u *User, activeAdmins int) error { return change(u, activeAdmins) })
+}
+
+// UpdateUserBy is UpdateUser for another account: change also sees the actor as it is inside the transaction.
+// An actorID of 0 is the operator, who has no account.
+func (s *Store) UpdateUserBy(ctx context.Context, actorID int64, name string, change func(actor User, u *User, activeAdmins int) error) (before, after User, err error) {
 	var refused error
 	err = inTx(ctx, s.db, func(tx *sql.Tx) error {
-		var err error
+		actor, err := actorByID(ctx, tx, actorID)
+		if err != nil {
+			return err
+		}
 		before, err = scanUser(tx.QueryRowContext(ctx, `SELECT `+userColumns+` FROM users WHERE username = ?`, name))
 		if err != nil {
 			return err
@@ -192,7 +201,7 @@ func (s *Store) UpdateUser(ctx context.Context, name string, change func(u *User
 			return err
 		}
 		after = before
-		if refused = change(&after, admins); refused != nil {
+		if refused = change(actor, &after, admins); refused != nil {
 			return refused
 		}
 		after.OperatorResetOnly = before.OperatorResetOnly || before.Role == RoleAdmin || after.Role == RoleAdmin

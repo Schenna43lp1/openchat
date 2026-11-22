@@ -1,0 +1,111 @@
+{{define "content"}}
+  <main class="admin-shell">
+    <div class="admin-panel admin-panel-narrow">
+      <header class="admin-header">
+        <div class="admin-title">
+          <a class="admin-back" href="/admin/users">&larr; Alle Benutzer</a>
+          <h1>{{.Target.Username}}</h1>
+          <p class="user-tags">
+            <span class="role-badge">{{.Target.Role}}</span>
+            {{if .Target.Banned}}<span class="status-badge status-badge-banned">gesperrt</span>{{end}}
+            {{if .Target.MustChangePassword}}<span class="status-badge status-badge-pending">Startpasswort offen</span>{{end}}
+            {{if not (or .Target.Banned .Target.MustChangePassword)}}<span class="status-badge">aktiv</span>{{end}}
+            {{if .Self}}<span class="status-badge status-badge-self">du</span>{{end}}
+          </p>
+          <p>Erstellt:
+            {{if .Target.CreatedAt.IsZero}}unbekannt{{else}}<time data-local="date" datetime="{{.Target.CreatedAt.UTC.Format "2006-01-02T15:04:05Z07:00"}}">{{.Target.CreatedAt.UTC.Format "02.01.2006 15:04"}} UTC</time>{{end}}</p>
+        </div>
+      </header>
+
+      {{if .Error}}
+      <p class="auth-error admin-message" role="alert">{{.Error}}</p>
+      {{end}}
+
+      {{if .Success}}
+      <p class="auth-success admin-message" role="status">{{.Success}}</p>
+      {{end}}
+
+      {{if .IsAdmin}}
+      <section class="admin-section" aria-labelledby="roleTitle">
+        <h2 id="roleTitle">Rolle</h2>
+        <form class="admin-form" method="post" action="/admin/users/{{.Target.ID}}">
+          <input type="hidden" name="from" value="{{.Target.Role}}">
+          <fieldset class="role-options">
+            <legend class="visually-hidden">Rolle von {{.Target.Username}}</legend>
+            {{range .Roles}}
+            <label class="role-option">
+              <input type="radio" name="role" value="{{.Role}}" {{if eq .Role $.Target.Role}}checked{{end}}>
+              <span><strong>{{.Role}}</strong> {{.Description}}</span>
+            </label>
+            {{end}}
+          </fieldset>
+          <label for="confirmation">Dein eigenes Passwort ({{.Admin}})</label>
+          <input id="confirmation" name="confirmation" type="password" autocomplete="current-password" required>
+          <button type="submit" class="admin-button" name="action" value="set_role">Rolle speichern</button>
+        </form>
+      </section>
+
+      <section class="admin-section" aria-labelledby="passwordTitle">
+        <h2 id="passwordTitle">Passwort</h2>
+        {{if .Self}}
+        <p>Dein eigenes Passwort aenderst du unter <a class="text-link" href="/account/password">Kontosicherheit</a>.</p>
+        {{else if .Target.OperatorResetOnly}}
+        <p>Dieses Konto ist oder war Admin. Sein Passwort setzt nur der Betreiber auf dem Server zurueck.</p>
+        {{else}}
+        <p>Vergibt ein Startpasswort und blendet die bisherigen Direktnachrichten fuer dieses Konto aus.</p>
+        <a class="admin-button button-secondary" href="/admin/users/{{.Target.ID}}/password">Passwort zuruecksetzen</a>
+        {{end}}
+
+        {{if .History.Total}}
+        <details class="admin-history">
+          <summary>Startpasswoerter: {{.History.Total}}-mal vergeben, {{.History.Redeemed}}-mal eingeloest</summary>
+          <ul class="issue-list">
+            {{range .History.Latest}}
+            <li>
+              <time data-local="date" datetime="{{.At.UTC.Format "2006-01-02T15:04:05Z07:00"}}">{{.At.UTC.Format "02.01.2006 15:04"}} UTC</time>
+              {{if eq .Kind "operator"}}
+              <span>Passwort zurueckgesetzt durch den Betreiber</span>
+              {{else}}
+              <span>{{if eq .Kind "created"}}Konto angelegt{{else}}Passwort zurueckgesetzt{{end}} von Admin <strong>{{.By}}</strong></span>
+              {{end}}
+              {{if .RedeemedAt.IsZero}}
+              <span>nicht eingeloest</span>
+              {{else}}
+              <span>eingeloest am <time data-local="date" datetime="{{.RedeemedAt.UTC.Format "2006-01-02T15:04:05Z07:00"}}">{{.RedeemedAt.UTC.Format "02.01.2006 15:04"}} UTC</time></span>
+              {{end}}
+            </li>
+            {{end}}
+          </ul>
+        </details>
+        {{end}}
+      </section>
+      {{end}}
+
+      <section class="admin-section" aria-labelledby="accessTitle">
+        <h2 id="accessTitle">Zugang</h2>
+        {{if .CanBan}}
+          {{if .Target.Banned}}
+        <p>Das Konto ist gesperrt. Nach dem Entsperren muss es sich neu anmelden.</p>
+        <form method="post" action="/admin/users/{{.Target.ID}}">
+          <button type="submit" class="admin-button button-secondary" name="action" value="unban">Entsperren</button>
+        </form>
+          {{else}}
+        <p>Eine Sperre beendet alle Anmeldungen und offenen Verbindungen des Kontos.</p>
+        <!-- Two steps without a script, the policy of this app allows no inline handlers. -->
+        <details class="ban-confirm">
+          <summary class="admin-button button-secondary">Konto sperren</summary>
+          <form method="post" action="/admin/users/{{.Target.ID}}">
+            <p><strong>{{.Target.Username}}</strong> wirklich sperren?</p>
+            <button type="submit" class="admin-button button-danger" name="action" value="ban">Ja, sperren</button>
+          </form>
+        </details>
+          {{end}}
+        {{else if .Self}}
+        <p>Dein eigenes Konto kannst du nicht sperren.</p>
+        {{else}}
+        <p>Moderatoren duerfen nur Benutzer mit der Rolle user sperren.</p>
+        {{end}}
+      </section>
+    </div>
+  </main>
+{{end}}

@@ -294,11 +294,7 @@ func (u *testUsers) SetRole(name string, role store.Role) error {
 }
 
 func (u *testUsers) SetBanned(name string, banned bool) error {
-	if user, ok := u.Find(name); ok && user.Banned == banned {
-		return nil
-	}
-	_, err := u.auth.ToggleBan(u.t.Context(), operator, name)
-	return err
+	return u.auth.SetBanned(u.t.Context(), operator, name, banned)
 }
 
 type testSessions struct {

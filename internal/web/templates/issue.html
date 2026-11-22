@@ -58,7 +58,14 @@
       {{end}}
 
       <div class="auth-footer">
+        {{if .Issued}}
+        <a class="text-link" href="/admin/users/{{.Issued.User.ID}}">Konto verwalten</a>
+        <a class="text-link" href="/admin/users">Alle Benutzer</a>
+        {{else if .Target}}
+        <a class="text-link" href="/admin/users/{{.Target.ID}}">Zurueck zum Konto</a>
+        {{else}}
         <a class="text-link" href="/admin/users">Zurueck zu den Benutzern</a>
+        {{end}}
       </div>
     </section>
   </main>
