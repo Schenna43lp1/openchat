@@ -87,12 +87,19 @@ func staffRequired(next http.Handler) http.Handler {
 	})
 }
 
+// unknownUserHash is compared for unknown names, so that they take as long as a wrong password.
+var unknownUserHash = sync.OnceValues(func() ([]byte, error) {
+	return bcrypt.GenerateFromPassword([]byte("openchat-unknown-user"), bcrypt.DefaultCost)
+})
+
 type UserStore struct {
-	mu     sync.RWMutex
-	path   string
-	format userStoreFormat
-	db     *sql.DB
-	users  map[string]authUser
+	compare func(hash, password []byte) error
+	dummy   []byte
+	mu      sync.RWMutex
+	path    string
+	format  userStoreFormat
+	db      *sql.DB
+	users   map[string]authUser
 }
 
 // userStoreFormat defines the persistence backend for users.
@@ -109,10 +116,16 @@ func isStaffRole(role UserRole) bool {
 
 // NewUserStore initializes the selected backend and loads users. It grants no roles.
 func NewUserStore(path string) (*UserStore, error) {
+	dummy, err := unknownUserHash()
+	if err != nil {
+		return nil, fmt.Errorf("prepare login check: %w", err)
+	}
 	store := &UserStore{
-		path:   path,
-		format: detectUserStoreFormat(path),
-		users:  make(map[string]authUser),
+		compare: bcrypt.CompareHashAndPassword,
+		dummy:   dummy,
+		path:    path,
+		format:  detectUserStoreFormat(path),
+		users:   make(map[string]authUser),
 	}
 	if err := store.initStorage(); err != nil {
 		return nil, err
@@ -177,11 +190,12 @@ func (s *UserStore) Authenticate(username, password string) (authUser, error) {
 	user, ok := s.users[strings.ToLower(username)]
 	s.mu.RUnlock()
 	if !ok {
+		_ = s.compare(s.dummy, []byte(password)) // only for the time it takes
 		logger.Printf("authentication failed: unknown user %q", username)
 		return authUser{}, errInvalidCredentials
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+	if err := s.compare([]byte(user.PasswordHash), []byte(password)); err != nil {
 		logger.Printf("authentication failed: wrong password for %q", username)
 		return authUser{}, errInvalidCredentials
 	}
