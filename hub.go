@@ -23,6 +23,7 @@ const (
 	EventSystem  EventType = "system"
 	EventUsers   EventType = "users"
 	EventHistory EventType = "history"
+	EventError   EventType = "error"
 )
 
 type ChatEvent struct {
@@ -51,6 +52,11 @@ type directMessage struct {
 	Text string
 }
 
+type clientNotice struct {
+	client *Client
+	text   string
+}
+
 // userDirectory lets the hub resolve accounts for routing and history visibility.
 type userDirectory interface {
 	Find(username string) (authUser, bool)
@@ -61,6 +67,7 @@ type Hub struct {
 	unregister chan *Client
 	broadcast  chan Message
 	direct     chan directMessage
+	notices    chan clientNotice
 	done       chan struct{}
 
 	clients     map[*Client]bool
@@ -84,6 +91,7 @@ func NewHubWithHistoryPath(logger *log.Logger, historyPath string, users userDir
 		unregister:  make(chan *Client),
 		broadcast:   make(chan Message, 256),
 		direct:      make(chan directMessage, 256),
+		notices:     make(chan clientNotice),
 		done:        make(chan struct{}),
 		clients:     make(map[*Client]bool),
 		historyPath: historyPath,
@@ -160,6 +168,13 @@ func (h *Hub) Run() {
 				})
 			}
 
+		case notice := <-h.notices:
+			// Only the hub may write to send, because it is the one closing that channel.
+			if h.clients[notice.client] {
+				event := newMessage(EventError, "", notice.text)
+				h.sendOne(notice.client, ChatEvent{Type: event.Type, Message: event.Message, Time: event.Time, Timestamp: event.Timestamp})
+			}
+
 		case <-h.done:
 			h.logger.Println("hub shutting down")
 			for client := range h.clients {
@@ -189,6 +204,14 @@ func (h *Hub) BroadcastMessage(username, text string) {
 // SendDirectMessage queues a direct message from sender to recipient.
 func (h *Hub) SendDirectMessage(from, to, text string) {
 	h.direct <- directMessage{From: from, To: to, Text: text}
+}
+
+// Notify reports a problem to one connection.
+func (h *Hub) Notify(client *Client, text string) {
+	select {
+	case h.notices <- clientNotice{client: client, text: text}:
+	case <-h.done:
+	}
 }
 
 // broadcastSystem emits system messages (join/leave) to all clients.

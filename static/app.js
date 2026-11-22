@@ -142,6 +142,10 @@
         }
         handleIncomingNotification(payload);
         break;
+      case "error":
+        addMessage({ type: "system", message: payload.message, time: payload.time });
+        showToast("Nicht gesendet", payload.message || "Die Nachricht wurde abgelehnt.");
+        break;
       case "users":
         renderUsers(payload.users || []);
         break;

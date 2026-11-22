@@ -3,19 +3,25 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gorilla/websocket"
 )
 
 // WebSocket client implementation for Open chat.
 const (
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 4096
+	writeWait  = 10 * time.Second
+	pongWait   = 60 * time.Second
+	pingPeriod = (pongWait * 9) / 10
+
+	maxMessageRunes = 4096
+	// JSON needs up to 12 bytes for one escaped character. This frame limit leaves room for that and
+	// for moderately oversized texts, which get an error event. Anything larger ends the connection.
+	maxFrameBytes = 64 * 1024
 
 	// A revoked client is closed within authCheckPeriod + revokeWriteWait, even if it is idle or not reading.
 	authCheckPeriod = 500 * time.Millisecond
@@ -50,7 +56,7 @@ func (c *Client) readPump() {
 		_ = c.conn.Close()
 	}()
 
-	c.conn.SetReadLimit(maxMessageSize)
+	c.conn.SetReadLimit(maxFrameBytes)
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -72,11 +78,16 @@ func (c *Client) readPump() {
 		rawMessage = bytes.TrimSpace(bytes.ReplaceAll(rawMessage, newline, []byte{' '}))
 		var inbound inboundMessage
 		if err := json.Unmarshal(rawMessage, &inbound); err != nil {
-			c.logger.Printf("invalid message from %s: %v", c.username, err)
+			c.logger.Printf("invalid message from %q: %v", c.username, err)
+			c.hub.Notify(c, "Die Nachricht war ungueltig und wurde nicht gesendet.")
 			continue
 		}
 
-		text := sanitizeMessage(inbound.Message)
+		text := strings.TrimSpace(inbound.Message)
+		if utf8.RuneCountInString(text) > maxMessageRunes {
+			c.hub.Notify(c, fmt.Sprintf("Die Nachricht ist zu lang (maximal %d Zeichen) und wurde nicht gesendet.", maxMessageRunes))
+			continue
+		}
 		if text == "" {
 			logger.Printf("ignored empty message from %q", c.username)
 			continue
@@ -156,13 +167,4 @@ func (c *Client) revoke() {
 	// Best effort: the connection is closed even if the close frame cannot be written.
 	_ = c.conn.WriteControl(websocket.CloseMessage, reason, time.Now().Add(revokeWriteWait))
 	_ = c.conn.Close()
-}
-
-// sanitizeMessage trims input and enforces maximum payload size.
-func sanitizeMessage(message string) string {
-	message = strings.TrimSpace(message)
-	if len(message) > maxMessageSize {
-		message = message[:maxMessageSize]
-	}
-	return message
 }
