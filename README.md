@@ -79,7 +79,13 @@ Der letzte aktive Admin kann nicht entfernt oder gesperrt werden. Eine Sperre be
 
 **Zurücksetzen durch einen Admin:** In der Benutzerliste auf **Passwort zuruecksetzen**. Alle Sessions des Kontos enden, und **seine bisherigen Direktnachrichten werden für dieses Konto dauerhaft ausgeblendet**, damit Admins sie auf diesem Weg nicht lesen können. Die Gesprächspartner behalten sie. Eine Sperre bleibt bestehen.
 
-Ein Admin kann sich mit einem Startpasswort, das er vergeben hat, selbst anmelden, dann **künftige** Nachrichten an das Konto lesen und in dessen Namen schreiben. Setzt er danach erneut zurück, merkt der Besitzer davon nichts. Nachvollziehen kann es nur der Betreiber im Serverlog (`password reset`, `password changed`, `login succeeded`). Die Admin-Rolle deshalb nur an Vertraute vergeben.
+Ein Admin kann sich mit einem Startpasswort, das er vergeben hat, selbst anmelden, dann **künftige** Nachrichten an das Konto lesen und in dessen Namen schreiben. Verhindern lässt sich das nicht, aber der Besitzer kann es sehen:
+
+- Unter **Passwort** steht, wann wer ein Startpasswort vergeben hat und wann damit ein eigenes Passwort gesetzt wurde (**eingeloest**). In der App kann das niemand löschen.
+- Nach einem Reset erscheint diese Liste vor dem Wechsel des Passworts, außerdem nach jedem Login aus einem Browser, der das aktuelle Passwort noch nicht benutzt hat. Im Chat verweist ein Hinweis darauf.
+- **Ein eingelöstes Startpasswort, das der Besitzer nicht selbst eingelöst hat, bedeutet: Jemand anderes hatte das Konto.** Dann den Betreiber fragen. Er findet die Einzelheiten im Serverlog (`password reset`, `password changed`, `login succeeded`).
+
+Das hilft nur, wenn die Nutzer die Liste lesen. Die Admin-Rolle nur an Vertraute vergeben.
 
 **Zurücksetzen durch den Betreiber:** Nur so geht es bei Admins und früheren Admins, auch beim einzigen. Der Verlauf bleibt sichtbar. Den Server vorher stoppen, sonst bleiben offene Verbindungen des Kontos bestehen:
 
@@ -116,7 +122,7 @@ Für ein Backup den Container stoppen und das Verzeichnis kopieren.
 
 ### Upgrade auf v1.2
 
-- **Vorher ein Backup machen.** Die Datenbank wird beim Start auf Schema 2 gebracht, eine ältere Version lehnt sie danach ab. Ein Downgrade geht nur mit dem Backup.
+- **Vorher ein Backup machen.** Die Datenbank wird beim Start auf Schema 3 gebracht, eine ältere Version lehnt sie danach ab. Ein Downgrade geht nur mit dem Backup.
 - Alle heutigen Admins, auch gesperrte, kann danach nur noch der Betreiber zurücksetzen. Wer schon vor dem Upgrade herabgestuft wurde, ist nicht mehr als früherer Admin erkennbar.
 
 ### Upgrade von v1.0.x auf v1.1
