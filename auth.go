@@ -46,6 +46,7 @@ var (
 	errUnknownUser        = errors.New("unknown user")
 	errLastAdmin          = errors.New("cannot change last admin")
 	errUserBanned         = errors.New("user is banned")
+	errSaveFailed         = errors.New("save users failed")
 	usernamePattern       = regexp.MustCompile(`^[A-Za-z0-9_.-]{3,32}$`)
 )
 
@@ -160,6 +161,7 @@ func (s *UserStore) Register(username, password string) error {
 	}
 
 	if err := s.saveLocked(); err != nil {
+		delete(s.users, key)
 		logger.Printf("save user registration for %q failed: %v", username, err)
 		return err
 	}
@@ -237,10 +239,12 @@ func (s *UserStore) SetRole(username string, role UserRole) error {
 		return errLastAdmin
 	}
 
+	previous := user
 	oldRole := user.Role
 	user.Role = role
 	s.users[key] = user
 	if err := s.saveLocked(); err != nil {
+		s.users[key] = previous
 		logger.Printf("save role change for %q to %q failed: %v", username, role, err)
 		return err
 	}
@@ -265,10 +269,12 @@ func (s *UserStore) SetBanned(username string, banned bool) error {
 		return errLastAdmin
 	}
 
+	previous := user
 	oldState := user.Banned
 	user.Banned = banned
 	s.users[key] = user
 	if err := s.saveLocked(); err != nil {
+		s.users[key] = previous
 		logger.Printf("save ban change for %q to=%t failed: %v", username, banned, err)
 		return err
 	}
@@ -345,12 +351,17 @@ func (s *UserStore) ensureAdmin() error {
 }
 
 func (s *UserStore) saveLocked() error {
+	var err error
 	switch s.format {
 	case userStoreSQLite:
-		return s.saveSQLiteLocked()
+		err = s.saveSQLiteLocked()
 	default:
-		return s.saveJSONLocked()
+		err = s.saveJSONLocked()
 	}
+	if err != nil {
+		return fmt.Errorf("%w: %w", errSaveFailed, err)
+	}
+	return nil
 }
 
 func (s *UserStore) saveJSONLocked() error {
@@ -590,6 +601,15 @@ func (m *SessionManager) Clear(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Active reports whether the token still belongs to a live, unexpired session.
+func (m *SessionManager) Active(token string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	current, ok := m.sessions[token]
+	return ok && !time.Now().After(current.ExpiresAt)
+}
+
 func (m *SessionManager) Delete(token string) {
 	m.mu.Lock()
 	delete(m.sessions, token)
@@ -767,6 +787,8 @@ func authErrorMessage(err error) string {
 		return "Dieser Benutzer wurde nicht gefunden."
 	case errors.Is(err, errLastAdmin):
 		return "Der letzte aktive Admin kann nicht entfernt oder gesperrt werden."
+	case errors.Is(err, errSaveFailed):
+		return "Die Aenderung konnte nicht gespeichert werden. Bitte versuche es spaeter erneut."
 	case errors.Is(err, errUserBanned):
 		return "Dieser Account wurde gesperrt."
 	default:

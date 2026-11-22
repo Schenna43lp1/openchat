@@ -55,6 +55,12 @@ func main() {
 		logger.Fatalf("parse admin template: %v", err)
 	}
 
+	for _, path := range []string{resolveUsersStorePath(), resolveChatHistoryPath()} {
+		if err := ensureWritable(path); err != nil {
+			logger.Fatalf("storage is not writable by uid %d (on Docker volumes, run chown -R 65532:65532 on the data directory): %v", os.Getuid(), err)
+		}
+	}
+
 	// User storage backend/path is resolved from env and can point to JSON or SQLite.
 	logger.Printf("loading user store from %s", resolveUsersStorePath())
 	users, err := NewUserStore(resolveUsersStorePath())
@@ -70,17 +76,10 @@ func main() {
 	sessions := NewSessionManager()
 
 	// Hub owns websocket clients and message fan-out.
-	hub := NewHub(logger)
+	hub := NewHub(logger, users)
 	go hub.Run()
 
-	mux := http.NewServeMux()
-	mux.Handle("/", authRequired(sessions, users, indexHandler(tmpl, logger)))
-	mux.Handle("/direct", authRequired(sessions, users, directHandler(directTmpl, logger)))
-	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, logger)))
-	mux.Handle("/admin/users", authRequired(sessions, users, staffRequired(adminUsersHandler(adminTmpl, users, logger))))
-	mux.HandleFunc("/login", loginHandler(loginTmpl, users, sessions, logger))
-	mux.HandleFunc("/logout", logoutHandler(sessions))
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux := newRouter(appTemplates{index: tmpl, direct: directTmpl, login: loginTmpl, admin: adminTmpl}, users, sessions, hub, logger)
 
 	server := &http.Server{
 		Addr:              defaultAddr,
@@ -96,6 +95,23 @@ func main() {
 	}()
 
 	waitForShutdown(logger, server, hub)
+}
+
+type appTemplates struct {
+	index, direct, login, admin *template.Template
+}
+
+// newRouter wires all routes with their access checks.
+func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *Hub, logger *log.Logger) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.Handle("/", authRequired(sessions, users, indexHandler(t.index, logger)))
+	mux.Handle("/direct", authRequired(sessions, users, directHandler(t.direct, logger)))
+	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, users, sessions, logger)))
+	mux.Handle("/admin/users", authRequired(sessions, users, staffRequired(adminUsersHandler(t.admin, users, logger))))
+	mux.HandleFunc("/login", loginHandler(t.login, users, sessions, logger))
+	mux.HandleFunc("/logout", logoutHandler(sessions))
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	return mux
 }
 
 type indexViewData struct {

@@ -82,7 +82,7 @@ func normalizeOrigin(raw string) (*url.URL, bool) {
 }
 
 // serveWebSocket upgrades authenticated HTTP requests and registers chat clients at the hub.
-func serveWebSocket(hub *Hub, logger *log.Logger) http.HandlerFunc {
+func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, logger *log.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -90,8 +90,10 @@ func serveWebSocket(hub *Hub, logger *log.Logger) http.HandlerFunc {
 		}
 
 		user, _ := r.Context().Value(currentUserContextKey).(currentUser)
-		username := sanitizeUsername(user.Username)
-		if username == "" {
+		// The exact account name is the identity; shortening it could collide with another account.
+		username := user.Username
+		cookie, err := r.Cookie(authCookieName)
+		if username == "" || err != nil {
 			logger.Printf("websocket rejected: unauthorized request from %s", r.RemoteAddr)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
@@ -105,27 +107,24 @@ func serveWebSocket(hub *Hub, logger *log.Logger) http.HandlerFunc {
 
 		logger.Printf("websocket connected user=%q remote=%s", username, r.RemoteAddr)
 
+		token := cookie.Value
 		client := &Client{
 			hub:      hub,
 			conn:     conn,
 			send:     make(chan ChatEvent, 256),
+			stopped:  make(chan struct{}),
 			username: username,
 			logger:   logger,
+			authorized: func() bool {
+				account, ok := users.Find(username)
+				return ok && !account.Banned && sessions.Active(token)
+			},
 		}
 
 		hub.register <- client
 
+		go client.watchAuthorization()
 		go client.writePump()
 		go client.readPump()
 	}
-}
-
-// sanitizeUsername ensures websocket identity is compact and printable.
-func sanitizeUsername(username string) string {
-	username = strings.TrimSpace(username)
-	username = strings.Join(strings.Fields(username), " ")
-	if len(username) > 32 {
-		username = username[:32]
-	}
-	return username
 }

@@ -11,10 +11,36 @@ import (
 	"time"
 )
 
+type fakeDirectory map[string]authUser
+
+func (d fakeDirectory) Find(username string) (authUser, bool) {
+	user, ok := d[username]
+	return user, ok
+}
+
+var testDirectory = fakeDirectory{
+	"alice":  {Username: "alice"},
+	"bob":    {Username: "bob"},
+	"nobody": {Username: "nobody"},
+}
+
+func startTestHub(t *testing.T) *Hub {
+	t.Helper()
+	hub := NewHubWithHistoryPath(log.New(io.Discard, "", 0), filepath.Join(t.TempDir(), "history.json"), testDirectory)
+	done := make(chan struct{})
+	go func() {
+		hub.Run()
+		close(done)
+	}()
+	t.Cleanup(func() {
+		hub.Close()
+		<-done
+	})
+	return hub
+}
+
 func TestDirectMessageDeliveredOnlyToParticipants(t *testing.T) {
-	hub := NewHub(log.New(io.Discard, "", 0))
-	go hub.Run()
-	defer hub.Close()
+	hub := startTestHub(t)
 
 	alice := &Client{hub: hub, send: make(chan ChatEvent, 32), username: "alice"}
 	bob := &Client{hub: hub, send: make(chan ChatEvent, 32), username: "bob"}
@@ -46,9 +72,7 @@ func TestDirectMessageDeliveredOnlyToParticipants(t *testing.T) {
 }
 
 func TestDirectMessageToOfflineUserSendsSystemNotice(t *testing.T) {
-	hub := NewHub(log.New(io.Discard, "", 0))
-	go hub.Run()
-	defer hub.Close()
+	hub := startTestHub(t)
 
 	alice := &Client{hub: hub, send: make(chan ChatEvent, 32), username: "alice"}
 	hub.register <- alice
@@ -64,7 +88,7 @@ func TestDirectMessageToOfflineUserSendsSystemNotice(t *testing.T) {
 
 func TestChatHistoryIsPersistedToDisk(t *testing.T) {
 	historyPath := filepath.Join(t.TempDir(), "chat-history.json")
-	hub := NewHubWithHistoryPath(log.New(io.Discard, "", 0), historyPath)
+	hub := NewHubWithHistoryPath(log.New(io.Discard, "", 0), historyPath, testDirectory)
 	hub.addToHistory(Message{Type: EventMessage, Username: "alice", Message: "hello", Time: "10:00:00", Timestamp: 1})
 	hub.addToHistory(Message{Type: EventDirect, Username: "alice", To: "bob", Message: "secret", Time: "10:01:00", Timestamp: 2})
 	hub.saveHistory()

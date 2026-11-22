@@ -256,13 +256,13 @@ Getestet werden u. a.:
 Stable:
 
 ```bash
-docker run -d --name openchat -p 8080:8080 ghcr.io/schenna43lp1/openchat:latest
+docker run -d --name openchat -p 8080:8080 -v openchat-data:/app/data ghcr.io/schenna43lp1/openchat:latest
 ```
 
 Dev:
 
 ```bash
-docker run -d --name openchat-dev -p 8080:8080 ghcr.io/schenna43lp1/openchat:dev
+docker run -d --name openchat-dev -p 8080:8080 -v openchat-dev-data:/app/data ghcr.io/schenna43lp1/openchat:dev
 ```
 
 ## 8.3 GitHub Actions Workflow

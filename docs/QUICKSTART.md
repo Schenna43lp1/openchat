@@ -18,7 +18,7 @@ http://localhost:8080
 ### Oder per Docker
 
 ```bash
-docker run -d --name openchat -p 8080:8080 ghcr.io/schenna43lp1/openchat:latest
+docker run -d --name openchat -p 8080:8080 -v openchat-data:/app/data ghcr.io/schenna43lp1/openchat:latest
 ```
 
 ## 2) Registrieren / Einloggen

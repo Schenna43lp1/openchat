@@ -16,6 +16,10 @@ const (
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
 	maxMessageSize = 4096
+
+	// A revoked client is closed within authCheckPeriod + revokeWriteWait, even if it is idle or not reading.
+	authCheckPeriod = 500 * time.Millisecond
+	revokeWriteWait = 200 * time.Millisecond
 )
 
 var newline = []byte{'\n'}
@@ -26,16 +30,22 @@ type Client struct {
 	send     chan ChatEvent
 	username string
 	logger   *log.Logger
+
+	// authorized is checked before every inbound and outbound event and periodically while idle.
+	authorized func() bool
+	stopped    chan struct{} // closed when readPump exits
 }
 
 type inboundMessage struct {
 	Message string `json:"message"`
-	To      string `json:"to,omitempty"`
+	// To is a pointer so that a blank recipient is rejected instead of becoming a public message.
+	To *string `json:"to,omitempty"`
 }
 
 // readPump consumes websocket frames, validates payloads and forwards chat messages to the hub.
 func (c *Client) readPump() {
 	defer func() {
+		close(c.stopped)
 		c.hub.unregister <- c
 		_ = c.conn.Close()
 	}()
@@ -54,6 +64,10 @@ func (c *Client) readPump() {
 			}
 			break
 		}
+		if !c.authorized() {
+			c.revoke()
+			break
+		}
 
 		rawMessage = bytes.TrimSpace(bytes.ReplaceAll(rawMessage, newline, []byte{' '}))
 		var inbound inboundMessage
@@ -68,8 +82,9 @@ func (c *Client) readPump() {
 			continue
 		}
 
-		recipient := sanitizeUsername(inbound.To)
-		if recipient != "" {
+		if inbound.To != nil {
+			// Never shorten the recipient: a truncated name can match a different account.
+			recipient := strings.TrimSpace(*inbound.To)
 			logger.Printf("direct message from %q to %q length=%d", c.username, recipient, len(text))
 			c.hub.SendDirectMessage(c.username, recipient, text)
 			continue
@@ -96,6 +111,10 @@ func (c *Client) writePump() {
 				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
+			if !c.authorized() {
+				c.revoke()
+				return
+			}
 
 			if err := c.conn.WriteJSON(event); err != nil {
 				c.logger.Printf("write websocket: %v", err)
@@ -109,6 +128,34 @@ func (c *Client) writePump() {
 			}
 		}
 	}
+}
+
+// watchAuthorization closes connections whose session or account was revoked.
+// It runs apart from writePump, which can block on a client that stops reading.
+func (c *Client) watchAuthorization() {
+	ticker := time.NewTicker(authCheckPeriod)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.stopped:
+			return
+		case <-ticker.C:
+			if !c.authorized() {
+				c.revoke()
+				return
+			}
+		}
+	}
+}
+
+// revoke closes the socket with the policy code that sends the browser to the login page.
+// Unlike data writes, WriteControl and Close may be called concurrently.
+func (c *Client) revoke() {
+	reason := websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "session revoked")
+	// Best effort: the connection is closed even if the close frame cannot be written.
+	_ = c.conn.WriteControl(websocket.CloseMessage, reason, time.Now().Add(revokeWriteWait))
+	_ = c.conn.Close()
 }
 
 // sanitizeMessage trims input and enforces maximum payload size.

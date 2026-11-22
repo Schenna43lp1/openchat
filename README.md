@@ -89,14 +89,39 @@ Direktnachrichten werden nur an Sender und Empfänger zugestellt.
 Stable:
 
 ```bash
-docker run -d --name openchat -p 8080:8080 ghcr.io/schenna43lp1/openchat:latest
+docker run -d --name openchat -p 8080:8080 -v openchat-data:/app/data ghcr.io/schenna43lp1/openchat:latest
 ```
 
 Dev:
 
 ```bash
-docker run -d --name openchat-dev -p 8080:8080 ghcr.io/schenna43lp1/openchat:dev
+docker run -d --name openchat-dev -p 8080:8080 -v openchat-dev-data:/app/data ghcr.io/schenna43lp1/openchat:dev
 ```
+
+### Daten und Upgrade
+
+Accounts und Chatverlauf liegen in `/app/data`. Der Container läuft als UID `65532` und startet nicht, wenn er dort nicht schreiben kann. Bei Bind-Mounts muss das Verzeichnis dieser UID gehören.
+
+Beim Upgrade von v1.0.1 oder älter die Daten sichern, **bevor** der alte Container entfernt wird. Die Befehle außerhalb des Repositorys ausführen, denn das Backup enthält Passwort-Hashes und Nachrichten. `openchat-backup` darf noch nicht existieren.
+
+Zuerst das neue Image laden, sonst startet Docker das zwischengespeicherte alte `latest` erneut:
+
+```bash
+docker pull ghcr.io/schenna43lp1/openchat:latest
+docker stop openchat
+docker cp openchat:/app/data ./openchat-backup
+```
+
+Erst wenn das Backup vorhanden ist:
+
+```bash
+docker rm openchat
+docker run --rm -v openchat-data:/data -v "${PWD}/openchat-backup:/backup:ro" alpine sh -c "cp -a /backup/. /data/ && chown -R 65532:65532 /data"
+```
+
+Danach den Container wie oben starten und bisherige `OPENCHAT_*`-Variablen mit `-e` wieder angeben.
+
+Ohne gespeicherte Accounts wird die erste Registrierung Admin. Dann zuerst nur mit `-p 127.0.0.1:8080:8080` starten, den Admin anlegen und erst danach öffentlich freigeben.
 
 ## CI/CD & Security
 

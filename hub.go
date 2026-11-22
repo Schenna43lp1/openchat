@@ -51,6 +51,11 @@ type directMessage struct {
 	Text string
 }
 
+// userDirectory lets the hub resolve accounts for routing and history visibility.
+type userDirectory interface {
+	Find(username string) (authUser, bool)
+}
+
 type Hub struct {
 	register   chan *Client
 	unregister chan *Client
@@ -59,6 +64,7 @@ type Hub struct {
 	done       chan struct{}
 
 	clients     map[*Client]bool
+	users       userDirectory
 	history     []Message
 	historyPath string
 	logger      *log.Logger
@@ -67,12 +73,12 @@ type Hub struct {
 }
 
 // NewHub creates the central chat event broker.
-func NewHub(logger *log.Logger) *Hub {
-	return NewHubWithHistoryPath(logger, resolveChatHistoryPath())
+func NewHub(logger *log.Logger, users userDirectory) *Hub {
+	return NewHubWithHistoryPath(logger, resolveChatHistoryPath(), users)
 }
 
 // NewHubWithHistoryPath creates the hub and loads persisted chat history from disk.
-func NewHubWithHistoryPath(logger *log.Logger, historyPath string) *Hub {
+func NewHubWithHistoryPath(logger *log.Logger, historyPath string, users userDirectory) *Hub {
 	hub := &Hub{
 		register:    make(chan *Client),
 		unregister:  make(chan *Client),
@@ -81,6 +87,7 @@ func NewHubWithHistoryPath(logger *log.Logger, historyPath string) *Hub {
 		done:        make(chan struct{}),
 		clients:     make(map[*Client]bool),
 		historyPath: historyPath,
+		users:       users,
 		logger:      logger,
 	}
 	hub.loadHistory()
@@ -95,7 +102,7 @@ func (h *Hub) Run() {
 			h.clients[client] = true
 			h.logger.Printf("client joined: %s", client.username)
 
-			client.send <- ChatEvent{Type: EventHistory, Messages: h.history}
+			client.send <- ChatEvent{Type: EventHistory, Messages: h.historyFor(client.username)}
 			h.broadcastSystem(client.username + " hat den Chat betreten.")
 			h.broadcastUsers()
 
@@ -123,23 +130,31 @@ func (h *Hub) Run() {
 			})
 
 		case message := <-h.direct:
-			recipient := strings.TrimSpace(message.To)
-			if recipient == "" {
-				h.logger.Printf("direct message ignored: empty recipient from %q", message.From)
+			// Only existing accounts may be addressed, otherwise whoever registers the name later could be targeted.
+			recipient, ok := h.users.Find(message.To)
+			if !ok {
+				h.logger.Printf("direct message rejected: unknown recipient from %q", message.From)
+				notice := newMessage(EventSystem, "", "Direktnachricht wurde nicht gesendet (Empfaenger unbekannt).")
+				h.sendToUsername(message.From, ChatEvent{
+					Type:      EventSystem,
+					Message:   notice.Message,
+					Time:      notice.Time,
+					Timestamp: notice.Timestamp,
+				})
 				continue
 			}
 
 			direct := newMessage(EventDirect, message.From, message.Text)
-			direct.To = recipient
-			h.logger.Printf("routing direct message from %q to %q", message.From, recipient)
+			direct.To = recipient.Username
+			h.logger.Printf("routing direct message from %q to %q", message.From, direct.To)
 			h.addToHistory(direct)
 			h.saveHistory()
 			delivered := h.sendDirect(direct)
 			if !delivered {
-				h.logger.Printf("direct message could not be delivered: recipient %q offline", recipient)
+				h.logger.Printf("direct message could not be delivered: recipient %q offline", direct.To)
 				h.sendToUsername(message.From, ChatEvent{
 					Type:      EventSystem,
-					Message:   "Direktnachricht konnte nicht zugestellt werden (Benutzer offline).",
+					Message:   "Benutzer ist offline. Die Direktnachricht steht im Verlauf, bis neuere Nachrichten sie verdraengen.",
 					Time:      direct.Time,
 					Timestamp: direct.Timestamp,
 				})
@@ -257,6 +272,33 @@ func (h *Hub) sendOne(client *Client, event ChatEvent) {
 		}
 		h.logger.Printf("dropped slow client: %s", client.username)
 	}
+}
+
+// historyFor returns the part of the shared history that username may read.
+// Direct messages are bound to the account: one created after a message was sent
+// never sees it, even if it carries the same name. Unknown event types are withheld.
+func (h *Hub) historyFor(username string) []Message {
+	var accountSince int64
+	canReadDirect := false
+	if user, ok := h.users.Find(username); ok {
+		if created, err := time.Parse(time.RFC3339, user.CreatedAt); err == nil {
+			accountSince, canReadDirect = created.UnixMilli(), true
+		}
+	}
+
+	visible := make([]Message, 0, len(h.history))
+	for _, message := range h.history {
+		switch message.Type {
+		case EventMessage, EventSystem:
+			visible = append(visible, message)
+		case EventDirect:
+			participant := strings.EqualFold(message.Username, username) || strings.EqualFold(message.To, username)
+			if participant && canReadDirect && message.Timestamp >= accountSince {
+				visible = append(visible, message)
+			}
+		}
+	}
+	return visible
 }
 
 // addToHistory keeps only the newest messages up to configured limit.
