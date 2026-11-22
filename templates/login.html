@@ -28,7 +28,7 @@
 
       <form class="auth-form" method="post" action="/login">
         <label for="username">Benutzername</label>
-        <input id="username" name="username" type="text" maxlength="32" pattern="[A-Za-z0-9_.-]{3,32}"
+        <input id="username" name="username" type="text" maxlength="32" pattern="[A-Za-z0-9_.\-]{3,32}"
           autocomplete="username" value="{{.Username}}" required>
 
         <label for="password">Passwort</label>
