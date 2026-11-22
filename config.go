@@ -11,12 +11,14 @@ import (
 const (
 	envAllowRegistration = "OPENCHAT_ALLOW_REGISTRATION"
 	envAdminUsername     = "OPENCHAT_ADMIN_USERNAME"
+	envCookieSecure      = "OPENCHAT_COOKIE_SECURE"
 	envTrustedProxies    = "OPENCHAT_TRUSTED_PROXIES"
 	envAdminPassword     = "OPENCHAT_ADMIN_PASSWORD"
 )
 
 type config struct {
 	allowRegistration bool
+	insecureCookie    bool
 	adminUsername     string
 	adminPassword     string
 	trustedProxies    []netip.Prefix
@@ -29,6 +31,11 @@ func loadConfig(getenv func(string) string) (config, error) {
 	if cfg.allowRegistration, err = envBool(getenv, envAllowRegistration, false); err != nil {
 		return config{}, err
 	}
+	secure, err := envBool(getenv, envCookieSecure, true)
+	if err != nil {
+		return config{}, err
+	}
+	cfg.insecureCookie = !secure
 	cfg.adminUsername, cfg.adminPassword = getenv(envAdminUsername), getenv(envAdminPassword)
 	if (cfg.adminUsername == "") != (cfg.adminPassword == "") {
 		return config{}, errors.New(envAdminUsername + " and " + envAdminPassword + " must be set together")

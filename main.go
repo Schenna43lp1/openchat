@@ -92,6 +92,10 @@ func main() {
 		logger.Warn("no active admin, set " + envAdminUsername + " and " + envAdminPassword + " and restart")
 	}
 	sessions := NewSessionManager()
+	if cfg.insecureCookie {
+		sessions.insecureCookie = true
+		logger.Warn("session cookie is sent over plain HTTP, use this only in a trusted network")
+	}
 
 	// Hub owns websocket clients and message fan-out.
 	hub := NewHub(logger, users)
@@ -106,6 +110,12 @@ func main() {
 		Addr:              defaultAddr,
 		Handler:           loggingMiddleware(logger, mux),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		// WebSockets are not affected, the connection deadlines end with the upgrade.
+		WriteTimeout:   30 * time.Second,
+		IdleTimeout:    2 * time.Minute,
+		MaxHeaderBytes: 64 << 10,
+		ErrorLog:       slog.NewLogLogger(logger.Handler(), slog.LevelWarn),
 	}
 
 	go func() {

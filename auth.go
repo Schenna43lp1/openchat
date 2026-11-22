@@ -553,6 +553,9 @@ func detectUserStoreFormat(path string) userStoreFormat {
 }
 
 type SessionManager struct {
+	// insecureCookie is for plain HTTP in a LAN. The zero value is the safe one.
+	insecureCookie bool
+
 	mu       sync.RWMutex
 	sessions map[string]session
 }
@@ -587,7 +590,7 @@ func (m *SessionManager) Create(w http.ResponseWriter, username string) error {
 		MaxAge:   int(sessionDuration.Seconds()),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   true,
+		Secure:   !m.insecureCookie,
 	})
 
 	logger.Debug("session created", "user", username, "expires", expires)
@@ -631,7 +634,7 @@ func (m *SessionManager) Clear(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   true,
+		Secure:   !m.insecureCookie,
 	})
 }
 
