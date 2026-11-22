@@ -40,7 +40,6 @@ profile.cov
 # Go workspace file
 go.work
 go.work.sum
-auth_test.go
 
 # Environment files
 .env
