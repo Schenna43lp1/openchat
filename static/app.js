@@ -84,13 +84,12 @@
 
     socket.addEventListener("close", function (event) {
       setStatus("offline", "Offline");
-      // Policy/protocol close codes indicate auth/session problems.
-      if (event.code === 1008 || event.code === 1002) {
-        window.location.href = "/login";
+      if (event.code === 1008) {
+        goToLogin();
         return;
       }
       if (!manuallyClosed) {
-        scheduleReconnect();
+        reconnectIfSignedIn();
       }
     });
 
@@ -98,6 +97,24 @@
       setStatus("offline", "Fehler");
       socket.close();
     });
+  }
+
+  function reconnectIfSignedIn() {
+    // A rejected handshake only shows up as code 1006, so ask for the reason.
+    fetch("/session", { cache: "no-store", credentials: "same-origin" })
+      .then(function (response) {
+        if (response.status === 401 || response.status === 403) {
+          goToLogin();
+          return;
+        }
+        scheduleReconnect();
+      })
+      .catch(scheduleReconnect);
+  }
+
+  function goToLogin() {
+    manuallyClosed = true;
+    window.location.href = "/login";
   }
 
   function scheduleReconnect() {

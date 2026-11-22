@@ -106,12 +106,20 @@ func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *
 	mux := http.NewServeMux()
 	mux.Handle("/", authRequired(sessions, users, indexHandler(t.index, logger)))
 	mux.Handle("/direct", authRequired(sessions, users, directHandler(t.direct, logger)))
+	mux.Handle("GET /session", authRequired(sessions, users, http.HandlerFunc(sessionCheckHandler)))
 	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, users, sessions, logger)))
 	mux.Handle("/admin/users", authRequired(sessions, users, staffRequired(adminUsersHandler(t.admin, users, logger))))
 	mux.HandleFunc("/login", loginHandler(t.login, users, sessions, logger))
 	mux.HandleFunc("/logout", logoutHandler(sessions))
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	return mux
+}
+
+// sessionCheckHandler answers behind authRequired. Browsers cannot read the status of a rejected
+// WebSocket handshake, so they ask here before they reconnect.
+func sessionCheckHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 type indexViewData struct {

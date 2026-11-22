@@ -75,7 +75,7 @@ func TestRoutePermissions(t *testing.T) {
 		{"banned-moderator", [4]int{redirect, redirect, redirect, forbidden}},
 		{"anonymous", [4]int{redirect, redirect, redirect, denied}},
 		{"expired", [4]int{redirect, redirect, redirect, denied}},
-		{"deleted", [4]int{redirect, redirect, redirect, redirect}},
+		{"deleted", [4]int{redirect, redirect, redirect, denied}},
 	} {
 		for i, route := range routes {
 			t.Run(tc.actor+route, func(t *testing.T) {

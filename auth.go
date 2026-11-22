@@ -678,9 +678,11 @@ func logoutHandler(sessions *SessionManager) http.HandlerFunc {
 // authRequired enforces login and injects the current user into request context.
 func authRequired(sessions *SessionManager, users *UserStore, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// These routes are called by scripts, which cannot act on a redirect to the login page.
+		wantsStatus := r.URL.Path == "/ws" || r.URL.Path == "/session"
 		username, ok := sessions.Username(r)
 		if !ok {
-			if r.URL.Path == "/ws" {
+			if wantsStatus {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -691,12 +693,16 @@ func authRequired(sessions *SessionManager, users *UserStore, next http.Handler)
 		user, ok := users.Find(username)
 		if !ok {
 			sessions.Clear(w, r)
+			if wantsStatus {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 		if user.Banned {
 			sessions.Clear(w, r)
-			if r.URL.Path == "/ws" {
+			if wantsStatus {
 				http.Error(w, "forbidden", http.StatusForbidden)
 				return
 			}
