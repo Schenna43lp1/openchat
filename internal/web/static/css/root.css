@@ -5,6 +5,8 @@
     --panel: #151c27;
     --panel-strong: #1b2331;
     --line: #2e3a4c;
+    /* Borders of fields need 3:1 against the panels, --line has 1.5:1 and only separates. */
+    --field-line: #6b7a90;
     --text: #edf2fa;
     --muted: #a1afc4;
     --accent: #58d68d;

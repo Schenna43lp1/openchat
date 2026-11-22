@@ -90,11 +90,16 @@ textarea,
 input,
 select {
   width: 100%;
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: var(--radius-soft);
   background: #111825;
   color: var(--text);
   outline: none;
+}
+
+::placeholder {
+  color: var(--muted);
+  opacity: 1;
 }
 
 input {
