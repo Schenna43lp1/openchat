@@ -77,10 +77,14 @@ Der letzte aktive Admin kann nicht entfernt oder gesperrt werden. Eine Sperre be
 | Was | Grenze |
 |---|---|
 | Login | 10 Versuche je Adresse, danach einer alle 6 Sekunden |
+| Fehlgeschlagene Logins | 20 je Account, danach einer alle 5 Minuten. Bekannte Browser haben ein eigenes Budget |
+| Verbindungen | 10 gleichzeitig je Account (Tabs und Geräte) |
 | Registrierung | 5 je Adresse, danach eine alle 12 Minuten |
 | Nachrichten | 10 je Account, danach eine pro Sekunde |
 | Request-Body | 64 KiB |
 | Aufbewahrung | die neuesten 100 öffentlichen Nachrichten und die neuesten 100 Direktnachrichten je Absender |
+
+Das Limit je Account bremst verteiltes Passwortraten. Damit Fremde den Besitzer nicht aussperren, erkennt der Server Browser, die sich schon angemeldet haben, am Cookie `openchat_device`. Es gewährt keinen Zugang. Während eines Angriffs kann eine Anmeldung von einem neuen Browser warten müssen, ein Neustart setzt die Budgets zurück.
 
 ## Daten, Backup und Upgrade
 
@@ -169,6 +173,7 @@ Client an Server:
 | 1008 | Session beendet | zum Login |
 | 1001 | Server fährt herunter | neu verbinden |
 | 1013 | vorübergehender Fehler | neu verbinden |
+| 4008 | zu viele Verbindungen des Accounts | nach 15 Sekunden neu versuchen |
 | 1006 | Verbindung abgebrochen oder abgelehnt | `/session` fragen, dann Login oder neu verbinden |
 
 ## Entwicklung

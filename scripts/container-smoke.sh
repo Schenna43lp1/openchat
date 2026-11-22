@@ -48,7 +48,7 @@ start --env OPENCHAT_ADMIN_USERNAME=smoke --env "OPENCHAT_ADMIN_PASSWORD=$passwo
 [ "$(sign_in register | status_of)" = 403 ] || fail "registration is open by default"
 headers="$(sign_in login)"
 [ "$(status_of <<<"$headers")" = 303 ] || fail "admin was not created"
-cookie="$(tr -d '\r' <<<"$headers" | sed -n 's/^[Ss]et-[Cc]ookie: \([^;]*\).*/\1/p')"
+cookie="$(tr -d '\r' <<<"$headers" | sed -n 's/^[Ss]et-[Cc]ookie: \(openchat_session=[^;]*\).*/\1/p')"
 [ -n "$cookie" ] || fail "login set no session cookie"
 
 docker stop "$name" >/dev/null

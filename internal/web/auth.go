@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -122,7 +123,25 @@ func (s *server) loginPost(w http.ResponseWriter, r *http.Request) {
 		if !s.admit(w, r, s.logins, username) {
 			return
 		}
-		user, err = s.Auth.Authenticate(r.Context(), username, password)
+		name, hash := username, ""
+		account, findErr := s.Auth.Find(r.Context(), username)
+		switch {
+		case findErr == nil:
+			name, hash = account.Username, account.PasswordHash
+		case !errors.Is(findErr, auth.ErrUnknownUser):
+			err = findErr
+		}
+		if err != nil {
+			break
+		}
+		allowed, wait, succeeded := s.guard.admit(r, name, hash)
+		if !allowed {
+			s.tooMany(w, username, wait)
+			return
+		}
+		if user, err = s.Auth.Authenticate(r.Context(), username, password); err == nil {
+			succeeded()
+		}
 	default:
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -145,6 +164,7 @@ func (s *server) loginPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.setCookie(w, token, expires)
+	rememberDevice(w, user.Username, user.PasswordHash, !s.InsecureCookie)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -154,9 +174,17 @@ func (s *server) admit(w http.ResponseWriter, r *http.Request, limit *rateLimite
 	if allowed {
 		return true
 	}
-	w.Header().Set("Retry-After", strconv.Itoa(int(wait/time.Second)+1))
-	s.renderLogin(w, http.StatusTooManyRequests, loginView{Username: username, Error: "Zu viele Versuche. Bitte warte kurz."})
+	s.tooMany(w, username, wait)
 	return false
+}
+
+func (s *server) tooMany(w http.ResponseWriter, username string, wait time.Duration) {
+	w.Header().Set("Retry-After", strconv.Itoa(int(wait/time.Second)+1))
+	message := "Zu viele Versuche. Bitte warte kurz."
+	if wait >= time.Minute {
+		message = fmt.Sprintf("Zu viele Versuche. Bitte versuche es in %d Minuten erneut.", int(wait/time.Minute)+1)
+	}
+	s.renderLogin(w, http.StatusTooManyRequests, loginView{Username: username, Error: message})
 }
 
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {

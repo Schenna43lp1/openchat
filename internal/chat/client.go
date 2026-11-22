@@ -43,6 +43,8 @@ type Access struct {
 	Authorized func(context.Context) (bool, error)
 	// AllowMessage consumes the message budget of the account.
 	AllowMessage func() bool
+	// Release is called once the connection is closed.
+	Release func()
 }
 
 type client struct {
@@ -73,6 +75,7 @@ func (h *Hub) Serve(conn *websocket.Conn, user store.User, access Access) {
 	}
 	if !h.join(c) {
 		c.closeWith(websocket.CloseGoingAway, "server shutdown")
+		access.Release()
 		return
 	}
 	go c.run()
@@ -87,8 +90,9 @@ func (c *client) run() {
 	c.readPump()
 
 	close(c.stopped)
-	c.hub.leave(c)
 	_ = c.conn.Close()
+	c.access.Release()
+	c.hub.leave(c)
 	helpers.Wait()
 }
 

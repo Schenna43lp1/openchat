@@ -58,6 +58,8 @@ type server struct {
 	pages         map[string]*template.Template
 	upgrader      websocket.Upgrader
 	logins        *rateLimiter
+	guard         *loginGuard
+	connections   *connectionLimiter
 	registrations *rateLimiter
 	messages      *rateLimiter
 }
@@ -68,6 +70,8 @@ func New(options Options) (http.Handler, error) {
 		Options:       options,
 		pages:         make(map[string]*template.Template),
 		logins:        newRateLimiter(loginBurst, loginInterval),
+		guard:         newLoginGuard(),
+		connections:   newConnectionLimiter(),
 		registrations: newRateLimiter(registrationBurst, registrationInterval),
 		messages:      newRateLimiter(messageBurst, messageInterval),
 	}
@@ -217,14 +221,25 @@ func (s *server) webSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := userFrom(r.Context())
+	key := fmt.Sprint(user.ID)
+	// Taken before the upgrade, so that parallel handshakes cannot overrun the limit.
+	release, admitted := s.connections.acquire(key)
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		if admitted {
+			release()
+		}
 		s.Logger.Warn("websocket upgrade failed", "user", user.Username, "err", err)
 		return
 	}
-	key := fmt.Sprint(user.ID)
+	if !admitted {
+		s.Logger.Warn("websocket refused: too many connections", "user", user.Username)
+		refuseConnection(conn)
+		return
+	}
 	s.Hub.Serve(conn, user, chat.Access{
 		Authorized: s.Auth.Watch(cookie.Value),
+		Release:    release,
 		AllowMessage: func() bool {
 			allowed, _ := s.messages.allow(key)
 			return allowed

@@ -38,6 +38,17 @@ func TestClosedRegistration(t *testing.T) {
 	a.signInAdmin()
 }
 
+// sessionCookies leaves out the cookie that recognizes the browser.
+func sessionCookies(res *http.Response) []*http.Cookie {
+	var found []*http.Cookie
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == cookieName {
+			found = append(found, cookie)
+		}
+	}
+	return found
+}
+
 func TestLoginFlow(t *testing.T) {
 	cases := []struct {
 		name, mode, username, password string
@@ -64,7 +75,7 @@ func TestLoginFlow(t *testing.T) {
 			if res.StatusCode != tc.status || !strings.Contains(body, tc.message) {
 				t.Fatalf("status = %d, body = %s", res.StatusCode, body)
 			}
-			cookies := res.Cookies()
+			cookies := sessionCookies(res)
 			if tc.user == "" {
 				if len(cookies) != 0 {
 					t.Fatal("rejected request received a cookie")
@@ -112,7 +123,7 @@ func TestCookieAttributes(t *testing.T) {
 	for _, insecure := range []bool{false, true} {
 		a := startTestAppWith(t, t.TempDir(), Options{AllowRegistration: true, InsecureCookie: insecure})
 		res, _ := a.post("/login", "", url.Values{"mode": {"register"}, "username": {"alice"}, "password": {testPassword}})
-		cookies := res.Cookies()
+		cookies := sessionCookies(res)
 		if len(cookies) != 1 {
 			t.Fatalf("cookies = %v", cookies)
 		}
