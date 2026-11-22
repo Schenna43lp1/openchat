@@ -169,7 +169,7 @@
         handleIncomingNotification(payload);
         break;
       case "error":
-        addMessage({ type: "system", message: payload.message, time: payload.time });
+        addMessage({ type: "system", message: payload.message, timestamp: payload.timestamp });
         showToast("Nicht gesendet", payload.message || "Die Nachricht wurde abgelehnt.");
         break;
       case "users":
@@ -195,7 +195,7 @@
     entry.className = `message ${message.type === "system" ? "system" : ""} ${message.type === "direct" ? "direct" : ""}`;
 
     if (message.type === "system") {
-      entry.textContent = `${message.time || ""} ${message.message || ""}`;
+      entry.append(window.openchatTime.create(message.timestamp), ` ${message.message || ""}`);
     } else {
       const meta = document.createElement("div");
       meta.className = "message-meta";
@@ -209,9 +209,7 @@
         user.textContent = message.username || "Unbekannt";
       }
 
-      const time = document.createElement("span");
-      time.className = "message-time";
-      time.textContent = message.time || "";
+      const time = window.openchatTime.create(message.timestamp, "message-time");
 
       const text = document.createElement("p");
       text.className = "message-text";

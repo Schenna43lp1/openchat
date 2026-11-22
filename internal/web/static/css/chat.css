@@ -249,11 +249,14 @@
 }
 
 .message-user {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--accent);
   font-weight: 700;
 }
 
 .message-time {
+  flex-shrink: 0;
   color: var(--muted);
   font-size: 0.74rem;
 }

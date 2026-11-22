@@ -166,7 +166,7 @@ Client an Server:
 { "message": "Hallo", "to": "bob" }
 ```
 
-`to` entfällt bei öffentlichen Nachrichten. Der Server sendet Events mit `type`: `history`, `message`, `direct`, `system`, `users` oder `error`.
+`to` entfällt bei öffentlichen Nachrichten. Zeiten stehen als Unix-Millisekunden in `timestamp`, der Browser zeigt sie in seiner Zeitzone. `time` ist die Uhrzeit des Servers und nur für ältere Clients da. Der Server sendet Events mit `type`: `history`, `message`, `direct`, `system`, `users` oder `error`.
 
 | Close-Code | Bedeutung | Reaktion des Clients |
 |---|---|---|

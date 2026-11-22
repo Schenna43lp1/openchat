@@ -35,6 +35,10 @@ func TestRenderedPages(t *testing.T) {
 				t.Errorf("%s: lacks %s", tc.path, part)
 			}
 		}
+		formatter, client := strings.Index(body, "/static/time.js"), strings.Index(body, "/static/app.js")
+		if formatter < 0 || (client >= 0 && client < formatter) {
+			t.Errorf("%s: time.js has to run before app.js", tc.path)
+		}
 		if script := strings.Index(body, "app.js"); script >= 0 && script < strings.Index(body, `id="toastStack"`) {
 			t.Errorf("%s: script runs before the toast area exists", tc.path)
 		}
