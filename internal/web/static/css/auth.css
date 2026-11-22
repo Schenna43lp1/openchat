@@ -64,3 +64,124 @@
 .auth-actions button {
   min-height: 2.8rem;
 }
+
+.auth-warning {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  border-radius: 6px;
+  background: rgba(250, 204, 21, 0.08);
+  color: #fde68a;
+}
+
+.auth-warning p {
+  margin: 0;
+}
+
+.auth-warning p + p {
+  margin-top: 0.5rem;
+}
+
+.auth-note {
+  margin: 1rem 0 0;
+  color: var(--muted);
+}
+
+.issued {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.issued dt {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.issued dd {
+  margin: 0 0 0.6rem;
+}
+
+.issued code {
+  display: block;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.issue-history {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  border-radius: 6px;
+  background: rgba(250, 204, 21, 0.08);
+  color: #fde68a;
+  font-size: 0.88rem;
+}
+
+.issue-history p {
+  margin: 0.4rem 0 0;
+}
+
+.issue-list {
+  max-height: 12rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  font-size: 0.88rem;
+}
+
+.issue-list li {
+  display: grid;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.issue-list li > time,
+.issue-more {
+  color: var(--muted);
+}
+
+.issue-more {
+  margin: 0.4rem 0 1rem;
+  font-size: 0.88rem;
+}
+
+.auth-section {
+  margin: 1.25rem 0 0.8rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.auth-section p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.issue-redeemed,
+.issue-advice {
+  font-weight: 700;
+}
+
+.issue-redeemed {
+  color: #fde68a;
+}
+
+.auth-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.auth-footer button {
+  min-height: 2.4rem;
+  padding: 0 0.85rem;
+}

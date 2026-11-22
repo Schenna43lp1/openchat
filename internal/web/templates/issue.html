@@ -1,0 +1,65 @@
+{{define "content"}}
+  <main class="auth-shell">
+    <section class="auth-panel" aria-label="{{if .Target}}Passwort zuruecksetzen{{else}}Konto anlegen{{end}}">
+      {{if .Issued}}
+      <header class="auth-header">
+        <h1>{{if .Target}}Passwort zurueckgesetzt{{else}}Konto angelegt{{end}}</h1>
+        <p>Gib das Startpasswort auf einem sicheren Weg weiter. Es wird nur dieses eine Mal angezeigt.</p>
+      </header>
+
+      <dl class="issued">
+        <dt>Benutzername</dt>
+        <dd><code>{{.Issued.User.Username}}</code></dd>
+        <dt>Startpasswort</dt>
+        <dd><code id="issuedPassword">{{.Issued.Password}}</code></dd>
+      </dl>
+
+      <p class="auth-note">Beim ersten Login muss ein eigenes Passwort gewaehlt werden.{{if .Issued.User.Banned}} Das Konto bleibt gesperrt.{{end}}</p>
+      {{else}}
+      <header class="auth-header">
+        {{with .Target}}
+        <h1>Passwort zuruecksetzen</h1>
+        <p>Konto <strong>{{.Username}}</strong></p>
+        {{else}}
+        <h1>Konto anlegen</h1>
+        <p>Das Konto bekommt die Rolle user und ein Startpasswort.</p>
+        {{end}}
+      </header>
+
+      {{if .Error}}
+      <p class="auth-error" role="alert">{{.Error}}</p>
+      {{end}}
+
+      {{if not .Blocked}}
+      {{if .Target}}
+      <div class="auth-warning">
+        <p><strong>Die bisherigen Direktnachrichten werden fuer dieses Konto dauerhaft ausgeblendet.</strong></p>
+        <p>Alle Anmeldungen des Kontos werden beendet. Soll der Verlauf bleiben, muss der Betreiber das Passwort auf dem Server zuruecksetzen.</p>
+      </div>
+      {{end}}
+
+      <form class="auth-form" method="post" action="{{with .Target}}/admin/users/{{.ID}}/password{{else}}/admin/users/new{{end}}">
+        {{if .Target}}
+        <input type="hidden" name="state" value="{{.State}}">
+        {{else}}
+        <label for="username">Benutzername des neuen Kontos</label>
+        <input id="username" name="username" type="text" maxlength="32" pattern="[A-Za-z0-9_.\-]{3,32}"
+          autocomplete="off" value="{{.Username}}" required>
+        {{end}}
+
+        <label for="confirmation">Dein eigenes Passwort ({{.Admin}})</label>
+        <input id="confirmation" name="confirmation" type="password" autocomplete="current-password" required>
+
+        <div class="auth-actions">
+          <button type="submit">{{if .Target}}Zuruecksetzen{{else}}Anlegen{{end}}</button>
+        </div>
+      </form>
+      {{end}}
+      {{end}}
+
+      <div class="auth-footer">
+        <a class="text-link" href="/admin/users">Zurueck zu den Benutzern</a>
+      </div>
+    </section>
+  </main>
+{{end}}

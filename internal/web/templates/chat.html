@@ -16,7 +16,9 @@
         <div class="chat-header-main">
           <h1>{{if .Direct}}Direkt-Chat{{else}}Open chat{{end}}</h1>
           <p class="signed-in">Angemeldet als <strong id="currentUser">{{.Username}}</strong> <span
-              class="role-badge">{{.Role}}</span></p>
+              class="role-badge">{{.Role}}</span>
+            <!-- In the header: the sidebar is below the fold on phones. -->
+            <a class="header-link" href="/account/password">Kontosicherheit</a></p>
           <nav class="top-nav" aria-label="Hauptnavigation">
             {{if .Direct}}
             <a class="top-nav__link" href="/">Chat</a>
@@ -71,6 +73,7 @@
         {{if .CanManageUsers}}
         <a class="account-link" href="/admin/users">Benutzer verwalten</a>
         {{end}}
+        <a class="account-link" href="/account/password">Kontosicherheit</a>
         <form method="post" action="/logout">
           <button type="submit" class="button-secondary">Logout</button>
         </form>

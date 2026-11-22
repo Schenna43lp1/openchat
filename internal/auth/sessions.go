@@ -87,7 +87,7 @@ func (s *Service) RemoveExpiredSessions(ctx context.Context) error {
 }
 
 // Watch returns a check for a long-lived connection. It is cheap enough for every event: the database
-// is only asked again after a logout or ban in this process. An error says nothing about the session.
+// is only asked again after a logout, ban or password change in this process. An error says nothing about the session.
 func (s *Service) Watch(token string) func(context.Context) (bool, error) {
 	hash := hashToken(token)
 	var (
@@ -111,7 +111,7 @@ func (s *Service) Watch(token string) func(context.Context) (bool, error) {
 			until = time.Time{}
 		case err != nil:
 			return false, err
-		case user.Banned:
+		case user.Banned, user.MustChangePassword:
 			until = time.Time{}
 		}
 		known, seen, expires = true, revision, until

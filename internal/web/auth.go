@@ -22,7 +22,8 @@ func userFrom(ctx context.Context) store.User {
 	return user
 }
 
-// authRequired enforces login and puts the current state of the account into the context.
+// authRequired enforces login and puts the current state of the account into the context. An account with an
+// issued password only gets to the password page. That is decided here, so that no route can forget it.
 func (s *server) authRequired(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// These routes are called by scripts, which cannot act on a redirect to the login page.
@@ -47,6 +48,13 @@ func (s *server) authRequired(next http.Handler) http.Handler {
 				s.Logger.Error("end session of banned account", "err", err)
 			}
 			deny(http.StatusForbidden)
+		// The matched route, not the path: "/account%2Fpassword" has the same path and is served by "/".
+		case user.MustChangePassword && r.Pattern != passwordPath:
+			if wantsStatus {
+				deny(http.StatusUnauthorized)
+			} else {
+				http.Redirect(w, r, passwordPath, http.StatusSeeOther)
+			}
 		default:
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), contextKey{}, user)))
 		}
@@ -64,6 +72,16 @@ func (s *server) currentSession(r *http.Request) (store.User, error) {
 func staffRequired(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !userFrom(r.Context()).Role.Staff() {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func adminRequired(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if userFrom(r.Context()).Role != store.RoleAdmin {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
@@ -109,6 +127,7 @@ func (s *server) loginPost(w http.ResponseWriter, r *http.Request) {
 
 	var user store.User
 	var err error
+	var knownDevice bool
 	switch r.FormValue("mode") {
 	case "register":
 		if !s.AllowRegistration {
@@ -134,6 +153,7 @@ func (s *server) loginPost(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			break
 		}
+		knownDevice = isKnownDevice(r, name, hash)
 		allowed, wait, succeeded := s.guard.admit(r, name, hash)
 		if !allowed {
 			s.tooMany(w, username, wait)
@@ -165,7 +185,23 @@ func (s *server) loginPost(w http.ResponseWriter, r *http.Request) {
 
 	s.setCookie(w, token, expires)
 	rememberDevice(w, user.Username, user.PasswordHash, !s.InsecureCookie)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	next := "/"
+	if !knownDevice && s.hasIssueHistory(r.Context(), user) {
+		next = passwordPath
+	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
+}
+
+// hasIssueHistory decides where a login from a browser lands that has never used the current password.
+// The forced page is not enough: whoever used an issued password can set the same one again as an own one
+// and hand that over. The device cookie ends with every new hash, so nobody can dismiss this for the owner.
+func (s *server) hasIssueHistory(ctx context.Context, user store.User) bool {
+	history, err := s.Auth.IssueHistory(ctx, user)
+	if err != nil {
+		s.Logger.Error("read issued passwords", "user", user.Username, "err", err)
+		return true // that page reports the failure
+	}
+	return history.Total > 0
 }
 
 // admit applies a rate limit before any expensive work is done.
@@ -179,12 +215,19 @@ func (s *server) admit(w http.ResponseWriter, r *http.Request, limit *rateLimite
 }
 
 func (s *server) tooMany(w http.ResponseWriter, username string, wait time.Duration) {
+	setRetryAfter(w, wait)
+	s.renderLogin(w, http.StatusTooManyRequests, loginView{Username: username, Error: waitMessage(wait)})
+}
+
+func setRetryAfter(w http.ResponseWriter, wait time.Duration) {
 	w.Header().Set("Retry-After", strconv.Itoa(int(wait/time.Second)+1))
-	message := "Zu viele Versuche. Bitte warte kurz."
+}
+
+func waitMessage(wait time.Duration) string {
 	if wait >= time.Minute {
-		message = fmt.Sprintf("Zu viele Versuche. Bitte versuche es in %d Minuten erneut.", int(wait/time.Minute)+1)
+		return fmt.Sprintf("Zu viele Versuche. Bitte versuche es in %d Minuten erneut.", int(wait/time.Minute)+1)
 	}
-	s.renderLogin(w, http.StatusTooManyRequests, loginView{Username: username, Error: message})
+	return "Zu viele Versuche. Bitte warte kurz."
 }
 
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
@@ -269,7 +312,15 @@ func errorMessage(err error) (message string, known bool) {
 	case errors.Is(err, auth.ErrStaffTarget):
 		return "Moderatoren duerfen nur Benutzer mit Rolle user sperren.", true
 	case errors.Is(err, auth.ErrForbidden):
-		return "Nur Admins duerfen Rollen aendern.", true
+		return "Nur Admins duerfen das.", true
+	case errors.Is(err, auth.ErrWrongPassword):
+		return "Dein Passwort ist falsch.", true
+	case errors.Is(err, auth.ErrSamePassword):
+		return "Das neue Passwort muss sich vom bisherigen unterscheiden.", true
+	case errors.Is(err, auth.ErrOperatorOnly):
+		return "Das Passwort von Admins und frueheren Admins setzt nur der Betreiber auf dem Server zurueck.", true
+	case errors.Is(err, auth.ErrAccountChanged):
+		return "Das Konto wurde inzwischen geaendert. Bitte pruefe es und versuche es dann erneut.", true
 	case errors.Is(err, store.ErrSave):
 		return "Die Aenderung konnte nicht gespeichert werden. Bitte versuche es spaeter erneut.", false
 	default:

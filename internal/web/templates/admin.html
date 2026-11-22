@@ -6,7 +6,12 @@
           <h1>Benutzer</h1>
           <p>Angemeldet als <strong>{{.CurrentUser.Username}}</strong></p>
         </div>
-        <a class="text-link" href="/">Zurueck zum Chat</a>
+        <div class="admin-links">
+          {{if .CanChangeRoles}}
+          <a class="text-link" href="/admin/users/new">Konto anlegen</a>
+          {{end}}
+          <a class="text-link" href="/">Zurueck zum Chat</a>
+        </div>
       </header>
 
       {{if .Error}}
@@ -49,6 +54,9 @@
             {{else}}
             <span class="status-badge">aktiv</span>
             {{end}}
+            {{if .MustChangePassword}}
+            <span class="status-badge status-badge-pending">Startpasswort</span>
+            {{end}}
           </span>
           <span role="cell">{{if not .CreatedAt.IsZero}}{{.CreatedAt.UTC.Format "2006-01-02T15:04:05Z07:00"}}{{end}}</span>
           <span role="cell">
@@ -60,6 +68,9 @@
               <button type="submit" class="button-secondary" name="action" value="toggle_ban">Entsperren</button>
               {{else}}
               <button type="submit" class="button-secondary" name="action" value="toggle_ban">Sperren</button>
+              {{end}}
+              {{if and $.CanChangeRoles (not .OperatorResetOnly)}}
+              <a class="text-link users-reset" href="/admin/users/{{.ID}}/password">Passwort zuruecksetzen</a>
               {{end}}
             </div>
           </span>

@@ -27,11 +27,27 @@ const (
 )
 
 func main() {
+	if len(os.Args) > 1 {
+		if err := command(os.Args[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "openchat:", err)
+			if errors.Is(err, errUsage) {
+				os.Exit(2)
+			}
+			os.Exit(1)
+		}
+		return
+	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	if err := start(logger); err != nil {
 		logger.Error("openchat stopped", "err", err)
 		os.Exit(1)
 	}
+}
+
+func command(args []string) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return runCommand(ctx, args, os.Getenv, os.Stdout, os.Stderr)
 }
 
 func start(logger *slog.Logger) error {

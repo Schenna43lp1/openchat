@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -31,20 +30,17 @@ func (s *Store) CreateSession(ctx context.Context, tokenHash []byte, user User, 
 
 // Session returns the account and the end of a session, which may have passed already.
 func (s *Store) Session(ctx context.Context, tokenHash []byte) (User, time.Time, error) {
-	var u User
-	var created, expires int64
-	err := s.db.QueryRowContext(ctx,
+	var expires int64
+	u, err := scanUser(s.db.QueryRowContext(ctx,
 		`SELECT `+userColumns+`, sessions.expires_at
 		   FROM sessions JOIN users ON users.id = sessions.user_id
-		  WHERE sessions.token_hash = ?`, tokenHash,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.Banned, &created, &expires)
-	if errors.Is(err, sql.ErrNoRows) {
+		  WHERE sessions.token_hash = ?`, tokenHash), &expires)
+	if errors.Is(err, ErrNotFound) {
 		return User{}, time.Time{}, ErrNotFound
 	}
 	if err != nil {
 		return User{}, time.Time{}, fmt.Errorf("read session: %w", err)
 	}
-	u.CreatedAt = fromMillis(created)
 	return u, time.UnixMilli(expires), nil
 }
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Checks that an image keeps accounts and sessions in a fresh volume, stops cleanly and refuses unwritable storage.
+# Checks that an image keeps accounts and sessions in a fresh volume, stops cleanly, lets the operator reset
+# a password and refuses unwritable storage.
 set -euo pipefail
 
 # Git Bash rewrites container paths, but curl still needs that for /dev/null.
@@ -59,6 +60,29 @@ start
 [ "$(sign_in login | status_of)" = 303 ] || fail "account did not survive a new container"
 code="$(curl --silent --output /dev/null --write-out '%{http_code}' --header "Cookie: $cookie" "$base/session")"
 [ "$code" = 204 ] || fail "session did not survive a new container"
+
+docker stop "$name" >/dev/null
+docker rm "$name" >/dev/null
+issued="$(docker run --rm --log-driver none --volume "$volume:/app/data" "$image" reset-password smoke 2>/dev/null)" ||
+  fail "operator could not reset the password"
+[[ "$issued" =~ ^[A-Z2-7]{26}$ ]] || fail "reset printed more or less than the password"
+
+start
+code="$(curl --silent --output /dev/null --write-out '%{http_code}' --header "Cookie: $cookie" "$base/session")"
+[ "$code" = 401 ] || fail "session survived a password reset"
+[ "$(sign_in login | status_of)" = 200 ] || fail "old password survived a reset"
+password="$issued"
+headers="$(sign_in login)"
+[ "$(status_of <<<"$headers")" = 303 ] || fail "issued password does not work"
+cookie="$(tr -d '\r' <<<"$headers" | sed -n 's/^[Ss]et-[Cc]ookie: \(openchat_session=[^;]*\).*/\1/p')"
+code="$(curl --silent --output /dev/null --write-out '%{http_code}' --header "Cookie: $cookie" "$base/session")"
+[ "$code" = 401 ] || fail "issued password gives access without a change"
+code="$(curl --silent --output /dev/null --write-out '%{http_code}' --header "Cookie: $cookie" \
+  --data "current=$issued&password=smoke-changed-password&repeat=smoke-changed-password" "$base/account/password")"
+[ "$code" = 303 ] || fail "issued password could not be changed"
+if docker logs "$name" 2>&1 | grep --quiet --fixed-strings "$issued"; then
+  fail "issued password is in the server log"
+fi
 
 cleanup
 status=0

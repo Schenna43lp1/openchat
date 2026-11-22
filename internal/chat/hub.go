@@ -166,6 +166,9 @@ func (h *Hub) add(ctx context.Context, c *client) {
 		// A message can be stored before this query and published after it. This keeps it from showing twice.
 		c.after = max(c.after, m.ID)
 	}
+	// A message can also be stored before a reset hid it and published afterwards. Every message up to the floor
+	// is older than the session of this connection, so the public ones among them are in the history.
+	c.after = max(c.after, c.user.DMVisibleAfterID)
 
 	arrived := !h.online(c.user.ID)
 	h.clients[c] = true

@@ -162,6 +162,7 @@ func TestRolePermissions(t *testing.T) {
 						for i := range want {
 							if want[i].Username == target {
 								want[i].Role = change.role
+								want[i].OperatorResetOnly = want[i].OperatorResetOnly || change.role == store.RoleAdmin
 							}
 						}
 					}

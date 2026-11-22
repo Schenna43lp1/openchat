@@ -38,6 +38,10 @@ var (
 	ErrStaffTarget        = errors.New("moderators can only ban users")
 	ErrForbidden          = errors.New("role does not allow this")
 	ErrAdminConflict      = errors.New("admin name belongs to an account with another password or a ban")
+	ErrWrongPassword      = errors.New("wrong password")
+	ErrSamePassword       = errors.New("new password equals the current one")
+	ErrOperatorOnly       = errors.New("only the operator can reset this account")
+	ErrAccountChanged     = errors.New("account changed meanwhile")
 )
 
 var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{3,32}$`)
@@ -88,19 +92,32 @@ func newAccount(username, password string, role store.Role) (store.User, error) 
 	if !usernamePattern.MatchString(username) {
 		return store.User{}, ErrInvalidUsername
 	}
-	if utf8.RuneCountInString(password) < MinPasswordRunes || len(password) > MaxPasswordBytes {
+	if !validPassword(password) {
 		return store.User{}, ErrInvalidPassword
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := hashPassword(password)
 	if err != nil {
-		return store.User{}, fmt.Errorf("hash password: %w", err)
+		return store.User{}, err
 	}
 	return store.User{
 		Username:     username,
-		PasswordHash: string(hash),
+		PasswordHash: hash,
 		Role:         role,
 		CreatedAt:    time.UnixMilli(time.Now().UnixMilli()),
 	}, nil
+}
+
+func validPassword(password string) bool {
+	return utf8.RuneCountInString(password) >= MinPasswordRunes && len(password) <= MaxPasswordBytes
+}
+
+// hashPassword is slow on purpose. It must not run inside a transaction, there is only one connection.
+func hashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("hash password: %w", err)
+	}
+	return string(hash), nil
 }
 
 // Authenticate checks a password. A ban is only revealed to whoever knows the password.
