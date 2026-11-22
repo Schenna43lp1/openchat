@@ -11,10 +11,12 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -741,11 +743,13 @@ type loginViewData struct {
 type loginPage struct {
 	tmpl              *template.Template
 	allowRegistration bool
+	trustedProxies    []netip.Prefix
+	logins            *rateLimiter
+	registrations     *rateLimiter
 }
 
 func handleLoginPost(w http.ResponseWriter, r *http.Request, page loginPage, users *UserStore, sessions *SessionManager, logger *log.Logger) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+	if !parseForm(w, r) {
 		return
 	}
 
@@ -759,11 +763,17 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, page loginPage, use
 			page.render(w, http.StatusForbidden, loginViewData{Username: username, Error: "Die Registrierung ist geschlossen."})
 			return
 		}
+		if !page.admit(w, r, page.registrations, username) {
+			return
+		}
 		if err := users.Register(username, password); err != nil {
 			page.render(w, http.StatusOK, loginViewData{Mode: mode, Username: username, Error: authErrorMessage(err)})
 			return
 		}
 	case "login", "":
+		if !page.admit(w, r, page.logins, username) {
+			return
+		}
 		user, err := users.Authenticate(username, password)
 		if err != nil {
 			page.render(w, http.StatusOK, loginViewData{Mode: "login", Username: username, Error: authErrorMessage(err)})
@@ -792,6 +802,31 @@ func (p loginPage) render(w http.ResponseWriter, status int, data loginViewData)
 	data.AllowRegistration = p.allowRegistration
 	w.WriteHeader(status)
 	_ = p.tmpl.Execute(w, data)
+}
+
+// admit applies a rate limit before any expensive work is done.
+func (p loginPage) admit(w http.ResponseWriter, r *http.Request, limit *rateLimiter, username string) bool {
+	allowed, wait := limit.allow(clientKey(r, p.trustedProxies))
+	if allowed {
+		return true
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(int(wait/time.Second)+1))
+	p.render(w, http.StatusTooManyRequests, loginViewData{Username: username, Error: "Zu viele Versuche. Bitte warte kurz."})
+	return false
+}
+
+func parseForm(w http.ResponseWriter, r *http.Request) bool {
+	err := r.ParseForm()
+	if err == nil {
+		return true
+	}
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+	} else {
+		http.Error(w, "bad request", http.StatusBadRequest)
+	}
+	return false
 }
 
 func authErrorMessage(err error) string {

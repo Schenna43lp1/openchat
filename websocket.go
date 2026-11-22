@@ -82,7 +82,7 @@ func normalizeOrigin(raw string) (*url.URL, bool) {
 }
 
 // serveWebSocket upgrades authenticated HTTP requests and registers chat clients at the hub.
-func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, logger *log.Logger) http.HandlerFunc {
+func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, messages *rateLimiter, logger *log.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -115,6 +115,10 @@ func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, logger
 			stopped:  make(chan struct{}),
 			username: username,
 			logger:   logger,
+			allowMessage: func() bool {
+				allowed, _ := messages.allow(strings.ToLower(username))
+				return allowed
+			},
 			authorized: func() bool {
 				account, ok := users.Find(username)
 				return ok && !account.Banned && sessions.Active(token)

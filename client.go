@@ -26,6 +26,9 @@ const (
 	// A revoked client is closed within authCheckPeriod + revokeWriteWait, even if it is idle or not reading.
 	authCheckPeriod = 500 * time.Millisecond
 	revokeWriteWait = 200 * time.Millisecond
+
+	// After a rejected frame the socket is not read for a moment, which slows a flood down at the source.
+	floodPause = 200 * time.Millisecond
 )
 
 var newline = []byte{'\n'}
@@ -39,7 +42,9 @@ type Client struct {
 
 	// authorized is checked before every inbound and outbound event and periodically while idle.
 	authorized func() bool
-	stopped    chan struct{} // closed when readPump exits
+	// allowMessage consumes the message budget of the account.
+	allowMessage func() bool
+	stopped      chan struct{} // closed when readPump exits
 }
 
 type inboundMessage struct {
@@ -73,6 +78,12 @@ func (c *Client) readPump() {
 		if !c.authorized() {
 			c.revoke()
 			break
+		}
+
+		if !c.allowMessage() {
+			c.hub.Notify(c, "Du sendest zu schnell. Die Nachricht wurde nicht gesendet.")
+			time.Sleep(floodPause)
+			continue
 		}
 
 		rawMessage = bytes.TrimSpace(bytes.ReplaceAll(rawMessage, newline, []byte{' '}))

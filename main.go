@@ -25,6 +25,16 @@ import (
 const (
 	defaultAddr     = ":8080"
 	shutdownTimeout = 10 * time.Second
+	maxBodyBytes    = 64 << 10
+
+	// Per client address. Registrations are rarer and cost storage, so their budget is smaller.
+	loginBurst           = 10
+	loginInterval        = 6 * time.Second
+	registrationBurst    = 5
+	registrationInterval = 12 * time.Minute
+	// Per account, over all of its connections.
+	messageBurst    = 10
+	messageInterval = time.Second
 )
 
 var logger = log.New(io.Discard, "", 0)
@@ -120,12 +130,18 @@ func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *
 	mux.Handle("/", authRequired(sessions, users, indexHandler(t.index, logger)))
 	mux.Handle("/direct", authRequired(sessions, users, directHandler(t.direct, logger)))
 	mux.Handle("GET /session", authRequired(sessions, users, http.HandlerFunc(sessionCheckHandler)))
-	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, users, sessions, logger)))
+	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, users, sessions, newRateLimiter(messageBurst, messageInterval), logger)))
 	mux.Handle("/admin/users", authRequired(sessions, users, staffRequired(adminUsersHandler(t.admin, users, logger))))
-	mux.HandleFunc("/login", loginHandler(loginPage{tmpl: t.login, allowRegistration: cfg.allowRegistration}, users, sessions, logger))
+	mux.HandleFunc("/login", loginHandler(loginPage{
+		tmpl:              t.login,
+		allowRegistration: cfg.allowRegistration,
+		trustedProxies:    cfg.trustedProxies,
+		logins:            newRateLimiter(loginBurst, loginInterval),
+		registrations:     newRateLimiter(registrationBurst, registrationInterval),
+	}, users, sessions, logger))
 	mux.HandleFunc("/logout", logoutHandler(sessions))
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-	return mux
+	return http.MaxBytesHandler(mux, maxBodyBytes)
 }
 
 // sessionCheckHandler answers behind authRequired. Browsers cannot read the status of a rejected

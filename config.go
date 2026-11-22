@@ -4,12 +4,14 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"strconv"
 )
 
 const (
 	envAllowRegistration = "OPENCHAT_ALLOW_REGISTRATION"
 	envAdminUsername     = "OPENCHAT_ADMIN_USERNAME"
+	envTrustedProxies    = "OPENCHAT_TRUSTED_PROXIES"
 	envAdminPassword     = "OPENCHAT_ADMIN_PASSWORD"
 )
 
@@ -17,6 +19,7 @@ type config struct {
 	allowRegistration bool
 	adminUsername     string
 	adminPassword     string
+	trustedProxies    []netip.Prefix
 }
 
 // loadConfig refuses invalid values, so a typo cannot silently weaken or break an instance.
@@ -29,6 +32,9 @@ func loadConfig(getenv func(string) string) (config, error) {
 	cfg.adminUsername, cfg.adminPassword = getenv(envAdminUsername), getenv(envAdminPassword)
 	if (cfg.adminUsername == "") != (cfg.adminPassword == "") {
 		return config{}, errors.New(envAdminUsername + " and " + envAdminPassword + " must be set together")
+	}
+	if cfg.trustedProxies, err = parseTrustedProxies(getenv(envTrustedProxies)); err != nil {
+		return config{}, fmt.Errorf("%s: %w", envTrustedProxies, err)
 	}
 	return cfg, nil
 }

@@ -39,8 +39,7 @@ func adminUsersHandler(tmpl *template.Template, users *UserStore, logger *log.Lo
 		case http.MethodGet:
 			renderAdminUsers(w, tmpl, data, logger)
 		case http.MethodPost:
-			if err := r.ParseForm(); err != nil {
-				http.Error(w, "bad request", http.StatusBadRequest)
+			if !parseForm(w, r) {
 				return
 			}
 
