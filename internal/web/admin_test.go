@@ -28,9 +28,9 @@ func newAccessFixture(t *testing.T) *accessFixture {
 		testAccount(t, "admin", store.RoleAdmin, false),
 		testAccount(t, "moderator", store.RoleModerator, false),
 		testAccount(t, "user", store.RoleUser, false),
-		testAccount(t, "banned", store.RoleUser, true),
-		testAccount(t, "banned-admin", store.RoleAdmin, true),
-		testAccount(t, "banned-moderator", store.RoleModerator, true),
+		testAccount(t, "banned", store.RoleUser, false),
+		testAccount(t, "banned-admin", store.RoleAdmin, false),
+		testAccount(t, "banned-moderator", store.RoleModerator, false),
 		testAccount(t, "other-admin", store.RoleAdmin, false),
 		testAccount(t, "other-moderator", store.RoleModerator, false),
 		testAccount(t, "other-user", store.RoleUser, false),
@@ -41,6 +41,9 @@ func newAccessFixture(t *testing.T) *accessFixture {
 	f.cookies["expired"] = newSessionCookie(t, f.sessions, "user")
 	expireSession(f.sessions, f.cookies["expired"].Value)
 	f.exec(`DELETE FROM users WHERE username = 'deleted'`)
+	// A ban deletes sessions and no session starts during one. Setting the flag directly keeps them,
+	// so that authRequired is tested on its own.
+	f.exec(`UPDATE users SET banned = 1 WHERE username IN ('banned', 'banned-admin', 'banned-moderator')`)
 	return f
 }
 

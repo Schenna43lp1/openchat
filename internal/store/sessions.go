@@ -8,12 +8,23 @@ import (
 	"time"
 )
 
-// CreateSession stores the hash of a token, never the token.
-func (s *Store) CreateSession(ctx context.Context, tokenHash []byte, userID int64, expires time.Time) error {
-	if _, err := s.db.ExecContext(ctx,
-		`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)`,
-		tokenHash, userID, expires.UnixMilli()); err != nil {
+// CreateSession stores the hash of a token, never the token. It returns ErrNotFound if the account is
+// banned, gone or has another password than user. The check and the write are one statement,
+// because any of that can happen while a password is being compared.
+func (s *Store) CreateSession(ctx context.Context, tokenHash []byte, user User, expires time.Time) error {
+	result, err := s.db.ExecContext(ctx,
+		`INSERT INTO sessions (token_hash, user_id, expires_at)
+		 SELECT ?, id, ? FROM users WHERE id = ? AND password_hash = ? AND banned = 0`,
+		tokenHash, expires.UnixMilli(), user.ID, user.PasswordHash)
+	if err != nil {
 		return fmt.Errorf("%w: create session: %w", ErrSave, err)
+	}
+	created, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%w: create session: %w", ErrSave, err)
+	}
+	if created == 0 {
+		return ErrNotFound
 	}
 	return nil
 }

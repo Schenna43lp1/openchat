@@ -59,7 +59,7 @@ func TestUpdateUser(t *testing.T) {
 	s := newTest(t)
 	bob, carol := addUser(t, s, "bob", RoleUser), addUser(t, s, "carol", RoleUser)
 	for _, u := range []User{bob, carol} {
-		if err := s.CreateSession(t.Context(), []byte(u.Username), u.ID, time.Now().Add(time.Hour)); err != nil {
+		if err := s.CreateSession(t.Context(), []byte(u.Username), u, time.Now().Add(time.Hour)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -94,7 +94,7 @@ func TestUpdateUser(t *testing.T) {
 func TestFailedWriteRollsBack(t *testing.T) {
 	s := newTest(t)
 	bob := addUser(t, s, "bob", RoleUser)
-	if err := s.CreateSession(t.Context(), []byte("token"), bob.ID, time.Now().Add(time.Hour)); err != nil {
+	if err := s.CreateSession(t.Context(), []byte("token"), bob, time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.db.ExecContext(t.Context(),
@@ -120,12 +120,23 @@ func TestSessions(t *testing.T) {
 	bob := addUser(t, s, "bob", RoleUser)
 	now := time.UnixMilli(time.Now().UnixMilli())
 	for token, expires := range map[string]time.Time{"live": now.Add(time.Hour), "old": now.Add(-time.Second)} {
-		if err := s.CreateSession(t.Context(), []byte(token), bob.ID, expires); err != nil {
+		if err := s.CreateSession(t.Context(), []byte(token), bob, expires); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := s.CreateSession(t.Context(), []byte("orphan"), 999, now); !errors.Is(err, ErrSave) {
-		t.Fatalf("session without an account: %v", err)
+	banned := addUser(t, s, "banned", RoleUser)
+	if _, _, err := s.UpdateUser(t.Context(), "banned", func(u *User, _ int) error {
+		u.Banned = true
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	otherPassword := bob
+	otherPassword.PasswordHash = "another hash"
+	for name, user := range map[string]User{"no account": {ID: 999}, "banned": banned, "other password": otherPassword} {
+		if err := s.CreateSession(t.Context(), []byte(name), user, now); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("session for %s: %v", name, err)
+		}
 	}
 	if err := s.Close(); err != nil {
 		t.Fatal(err)

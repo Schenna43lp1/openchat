@@ -330,7 +330,7 @@ func (s *testSessions) setExpiry(token string, expires time.Time) {
 	if err := s.db.DeleteSession(s.t.Context(), hash[:]); err != nil {
 		s.t.Fatal(err)
 	}
-	if err := s.db.CreateSession(s.t.Context(), hash[:], user.ID, expires); err != nil {
+	if err := s.db.CreateSession(s.t.Context(), hash[:], user, expires); err != nil {
 		s.t.Fatal(err)
 	}
 }

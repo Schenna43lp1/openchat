@@ -26,7 +26,8 @@ func hashToken(token string) []byte {
 	return sum[:]
 }
 
-// StartSession returns a new token. Only its hash is stored.
+// StartSession returns a new token. Only its hash is stored. user is the account whose password was checked:
+// if it was banned or got another password since, there is no session.
 func (s *Service) StartSession(ctx context.Context, user store.User) (token string, expires time.Time, err error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
@@ -34,7 +35,12 @@ func (s *Service) StartSession(ctx context.Context, user store.User) (token stri
 	}
 	token = base64.RawURLEncoding.EncodeToString(raw)
 	expires = time.Now().Add(SessionDuration)
-	if err := s.store.CreateSession(ctx, hashToken(token), user.ID, expires); err != nil {
+	err = s.store.CreateSession(ctx, hashToken(token), user, expires)
+	if errors.Is(err, store.ErrNotFound) {
+		s.logger.Warn("login failed", "user", user.Username, "reason", "account changed during login")
+		return "", time.Time{}, ErrInvalidCredentials
+	}
+	if err != nil {
 		return "", time.Time{}, err
 	}
 	return token, expires, nil

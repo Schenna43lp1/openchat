@@ -333,7 +333,7 @@ func TestSessions(t *testing.T) {
 		}
 	}
 
-	if err := st.CreateSession(t.Context(), hashToken("expired"), alice.ID, time.Now().Add(-time.Second)); err != nil {
+	if err := st.CreateSession(t.Context(), hashToken("expired"), alice, time.Now().Add(-time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Session(t.Context(), "expired"); !errors.Is(err, ErrNoSession) {
@@ -342,7 +342,7 @@ func TestSessions(t *testing.T) {
 	if _, _, err := st.Session(t.Context(), hashToken("expired")); !errors.Is(err, store.ErrNotFound) {
 		t.Fatal("expired session was not removed")
 	}
-	if err := st.CreateSession(t.Context(), hashToken("stale"), alice.ID, time.Now().Add(-time.Second)); err != nil {
+	if err := st.CreateSession(t.Context(), hashToken("stale"), alice, time.Now().Add(-time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.RemoveExpiredSessions(t.Context()); err != nil {
@@ -364,7 +364,7 @@ func TestWatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.CreateSession(t.Context(), hashToken("short"), alice.ID, time.Now().Add(1500*time.Millisecond)); err != nil {
+	if err := st.CreateSession(t.Context(), hashToken("short"), alice, time.Now().Add(1500*time.Millisecond)); err != nil {
 		t.Fatal(err)
 	}
 
