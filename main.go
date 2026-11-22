@@ -102,7 +102,10 @@ func main() {
 	hub := NewHub(logger, users)
 	go hub.Run()
 
-	mux := newRouter(appTemplates{index: tmpl, direct: directTmpl, login: loginTmpl, admin: adminTmpl}, users, sessions, hub, cfg, logger)
+	mux, err := newRouter(appTemplates{index: tmpl, direct: directTmpl, login: loginTmpl, admin: adminTmpl}, users, sessions, hub, cfg, logger)
+	if err != nil {
+		logger.Fatalf("configure routes: %v", err)
+	}
 
 	server := &http.Server{
 		Addr:              defaultAddr,
@@ -125,7 +128,7 @@ type appTemplates struct {
 }
 
 // newRouter wires all routes with their access checks.
-func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *Hub, cfg config, logger *log.Logger) http.Handler {
+func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *Hub, cfg config, logger *log.Logger) (http.Handler, error) {
 	mux := http.NewServeMux()
 	mux.Handle("/", authRequired(sessions, users, indexHandler(t.index, logger)))
 	mux.Handle("/direct", authRequired(sessions, users, directHandler(t.direct, logger)))
@@ -141,7 +144,7 @@ func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *
 	}, users, sessions, logger))
 	mux.HandleFunc("/logout", logoutHandler(sessions))
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-	return http.MaxBytesHandler(mux, maxBodyBytes)
+	return rejectCrossOrigin(http.MaxBytesHandler(mux, maxBodyBytes))
 }
 
 // sessionCheckHandler answers behind authRequired. Browsers cannot read the status of a rejected

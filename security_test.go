@@ -55,7 +55,11 @@ func startTestAppWith(t *testing.T, dir string, cfg config) *testApp {
 		close(a.hubDone)
 	}()
 	tmpl := appTemplates{index: parse("index"), direct: parse("direct"), login: parse("login"), admin: parse("admin")}
-	a.server = httptest.NewServer(newRouter(tmpl, users, a.sessions, a.hub, cfg, l))
+	handler, err := newRouter(tmpl, users, a.sessions, a.hub, cfg, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.server = httptest.NewServer(handler)
 	t.Cleanup(a.stop)
 	return a
 }

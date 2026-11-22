@@ -48,7 +48,11 @@ func startE2EServer(t *testing.T, dir, usersFile string) *e2eServer {
 
 	s := &e2eServer{}
 	// TLS is required: the cookie jar, like a browser, returns the Secure session cookie only over HTTPS.
-	s.Server = httptest.NewTLSServer(loggingMiddleware(l, newRouter(pages, users, NewSessionManager(), hub, config{allowRegistration: true}, l)))
+	handler, err := newRouter(pages, users, NewSessionManager(), hub, config{allowRegistration: true}, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Server = httptest.NewTLSServer(loggingMiddleware(l, handler))
 	stopped := false
 	s.stop = func() {
 		if stopped {
