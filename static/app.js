@@ -88,6 +88,15 @@
         goToLogin();
         return;
       }
+      if (event.code === 4008) {
+        setStatus("offline", "Zu viele Tabs offen");
+        // "open" resets the delay before this close arrives, so set it here.
+        reconnectDelay = 15000;
+        if (!manuallyClosed) {
+          scheduleReconnect();
+        }
+        return;
+      }
       if (!manuallyClosed) {
         reconnectIfSignedIn();
       }

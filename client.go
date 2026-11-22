@@ -44,7 +44,9 @@ type Client struct {
 	authorized func() bool
 	// allowMessage consumes the message budget of the account.
 	allowMessage func() bool
-	stopped      chan struct{} // closed when readPump exits
+	// release frees the connection slot of the account.
+	release func()
+	stopped chan struct{} // closed when readPump exits
 }
 
 type inboundMessage struct {
@@ -57,8 +59,9 @@ type inboundMessage struct {
 func (c *Client) readPump() {
 	defer func() {
 		close(c.stopped)
-		c.hub.unregister <- c
 		_ = c.conn.Close()
+		c.release()
+		c.hub.unregister <- c
 	}()
 
 	c.conn.SetReadLimit(maxFrameBytes)

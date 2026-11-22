@@ -82,7 +82,7 @@ func normalizeOrigin(raw string) (*url.URL, bool) {
 }
 
 // serveWebSocket upgrades authenticated HTTP requests and registers chat clients at the hub.
-func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, messages *rateLimiter, logger *slog.Logger) http.HandlerFunc {
+func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, messages *rateLimiter, connections *connectionLimiter, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -99,9 +99,19 @@ func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, messag
 			return
 		}
 
+		// Taken before the upgrade, so that parallel handshakes cannot overrun the limit.
+		release, admitted := connections.acquire(strings.ToLower(username))
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
+			if admitted {
+				release()
+			}
 			logger.Warn("websocket upgrade failed", "user", username, "err", err)
+			return
+		}
+		if !admitted {
+			logger.Warn("websocket refused: too many connections", "user", username)
+			refuseConnection(conn)
 			return
 		}
 
@@ -115,6 +125,7 @@ func serveWebSocket(hub *Hub, users *UserStore, sessions *SessionManager, messag
 			stopped:  make(chan struct{}),
 			username: username,
 			logger:   logger,
+			release:  release,
 			allowMessage: func() bool {
 				allowed, _ := messages.allow(strings.ToLower(username))
 				return allowed

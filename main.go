@@ -143,7 +143,7 @@ func newRouter(t appTemplates, users *UserStore, sessions *SessionManager, hub *
 	mux.Handle("/", authRequired(sessions, users, indexHandler(t.index, logger)))
 	mux.Handle("/direct", authRequired(sessions, users, directHandler(t.direct, logger)))
 	mux.Handle("GET /session", authRequired(sessions, users, http.HandlerFunc(sessionCheckHandler)))
-	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, users, sessions, newRateLimiter(messageBurst, messageInterval), logger)))
+	mux.Handle("/ws", authRequired(sessions, users, serveWebSocket(hub, users, sessions, newRateLimiter(messageBurst, messageInterval), newConnectionLimiter(), logger)))
 	mux.Handle("/admin/users", authRequired(sessions, users, staffRequired(adminUsersHandler(t.admin, users, logger))))
 	mux.HandleFunc("/login", loginHandler(loginPage{
 		tmpl:              t.login,
