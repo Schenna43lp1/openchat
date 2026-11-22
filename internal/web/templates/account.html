@@ -1,0 +1,49 @@
+{{define "content"}}
+  <main class="auth-shell">
+    <section class="auth-panel" aria-label="Passwort aendern">
+      <header class="auth-header">
+        <h1>Passwort aendern</h1>
+        {{if .Forced}}
+        <p>Du nutzt ein Startpasswort. Waehle ein eigenes, dann geht es zum Chat.</p>
+        {{else}}
+        <p>Angemeldet als <strong>{{.Username}}</strong>. Alle anderen Anmeldungen werden dabei beendet.</p>
+        {{end}}
+      </header>
+
+      {{if .Error}}
+      <p class="auth-error" role="alert">{{.Error}}</p>
+      {{end}}
+
+      {{if .Success}}
+      <p class="auth-success" role="status">{{.Success}}</p>
+      {{end}}
+
+      <form class="auth-form" method="post" action="/account/password">
+        <!-- Tells password managers which account the new password belongs to. -->
+        <input type="text" name="username" value="{{.Username}}" autocomplete="username" readonly hidden>
+
+        <label for="current">{{if .Forced}}Startpasswort{{else}}Aktuelles Passwort{{end}}</label>
+        <input id="current" name="current" type="password" autocomplete="current-password" required>
+
+        <label for="password">Neues Passwort</label>
+        <input id="password" name="password" type="password" minlength="8" autocomplete="new-password" required>
+
+        <label for="repeat">Neues Passwort wiederholen</label>
+        <input id="repeat" name="repeat" type="password" minlength="8" autocomplete="new-password" required>
+
+        <div class="auth-actions">
+          <button type="submit">Passwort speichern</button>
+        </div>
+      </form>
+
+      <div class="auth-footer">
+        {{if not .Forced}}
+        <a class="text-link" href="/">Zurueck zum Chat</a>
+        {{end}}
+        <form method="post" action="/logout">
+          <button type="submit" class="button-secondary">Logout</button>
+        </form>
+      </div>
+    </section>
+  </main>
+{{end}}
