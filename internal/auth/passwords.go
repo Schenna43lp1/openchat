@@ -185,6 +185,16 @@ func (s *Service) setPassword(ctx context.Context, change store.PasswordChange) 
 	return user, err
 }
 
+// ConfirmPassword checks the password of user as it was read for this request. Callers that write something
+// based on the check pass user.PasswordHash on, so that the write fails if the password changed meanwhile.
+func (s *Service) ConfirmPassword(user store.User, password string) error {
+	if s.compare([]byte(user.PasswordHash), []byte(password)) != nil {
+		s.logger.Warn("confirmation failed", "user", user.Username, "reason", "wrong password")
+		return ErrWrongPassword
+	}
+	return nil
+}
+
 func (s *Service) confirmAdmin(actor store.User, password string) error {
 	if actor.Role != store.RoleAdmin || actor.Banned || actor.MustChangePassword {
 		return ErrForbidden
