@@ -70,7 +70,7 @@ func launchTestApp(t *testing.T, dir string, options Options, serve func(http.Ha
 		t.Fatal(err)
 	}
 	hub := chat.NewHub(db, options.Logger)
-	options.Auth, options.Hub, options.Health = service, hub, db.Ping
+	options.Auth, options.Hub, options.Health, options.Keys = service, hub, db.Ping, db
 	handler, err := New(options)
 	if err != nil {
 		t.Fatal(err)

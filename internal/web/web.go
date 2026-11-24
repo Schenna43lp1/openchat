@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -40,11 +41,20 @@ const (
 	healthTimeout = 2 * time.Second
 )
 
+// KeyStore holds the keys for end-to-end encryption. *store.Store implements it.
+type KeyStore interface {
+	InstanceID(ctx context.Context) ([]byte, error)
+	CurrentKey(ctx context.Context, userID int64) (store.UserKey, error)
+	CurrentKeyByName(ctx context.Context, name string) (store.User, store.UserKey, error)
+	AddKey(ctx context.Context, k store.UserKey, checkedHash string) (store.UserKey, error)
+}
+
 // Options are the dependencies and settings of the handler.
 type Options struct {
 	Auth   *auth.Service
 	Hub    *chat.Hub
 	Health func(context.Context) error
+	Keys   KeyStore
 	Logger *slog.Logger
 
 	AllowRegistration bool
@@ -64,10 +74,14 @@ type server struct {
 	messages      *rateLimiter
 	confirmations *rateLimiter
 	passwordWork  *rateLimiter
+	keyWrites     *rateLimiter
 }
 
 // New returns the handler of the whole application.
 func New(options Options) (http.Handler, error) {
+	if options.Keys == nil {
+		return nil, errors.New("web: Options.Keys is required")
+	}
 	s := &server{
 		Options:       options,
 		pages:         make(map[string]*template.Template),
@@ -78,6 +92,7 @@ func New(options Options) (http.Handler, error) {
 		messages:      newRateLimiter(messageBurst, messageInterval),
 		confirmations: newRateLimiter(confirmationBurst, confirmationInterval),
 		passwordWork:  newRateLimiter(passwordWorkBurst, passwordWorkInterval),
+		keyWrites:     newRateLimiter(keyWriteBurst, keyWriteInterval),
 	}
 	s.upgrader = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024, CheckOrigin: s.checkOrigin}
 
@@ -103,6 +118,9 @@ func New(options Options) (http.Handler, error) {
 	mux.Handle("/admin/users/new", s.authRequired(adminRequired(http.HandlerFunc(s.newAccount))))
 	mux.Handle("/admin/users/{id}/password", s.authRequired(adminRequired(http.HandlerFunc(s.resetPassword))))
 	mux.Handle(passwordPath, s.authRequired(http.HandlerFunc(s.changePassword)))
+	mux.Handle(keyPath, s.authRequired(http.HandlerFunc(s.accountKey)))
+	mux.Handle("POST "+keyUnlockPath, s.authRequired(http.HandlerFunc(s.unlockKey)))
+	mux.Handle("GET /keys/{name}", s.authRequired(http.HandlerFunc(s.publicKey)))
 	mux.HandleFunc("/login", s.login)
 	mux.HandleFunc("/logout", s.logout)
 	mux.HandleFunc("GET /healthz", s.health)

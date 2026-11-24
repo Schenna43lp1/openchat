@@ -27,7 +27,8 @@ func userFrom(ctx context.Context) store.User {
 func (s *server) authRequired(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// These routes are called by scripts, which cannot act on a redirect to the login page.
-		wantsStatus := r.URL.Path == "/ws" || r.URL.Path == "/session"
+		wantsStatus := r.URL.Path == "/ws" || r.URL.Path == "/session" || r.URL.Path == keyPath || r.URL.Path == keyUnlockPath ||
+			strings.HasPrefix(r.URL.Path, "/keys/")
 		deny := func(status int) {
 			if wantsStatus {
 				http.Error(w, strings.ToLower(http.StatusText(status)), status)

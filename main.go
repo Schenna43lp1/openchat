@@ -119,6 +119,7 @@ func run(ctx context.Context, cfg config, listener net.Listener, logger *slog.Lo
 		Auth:              accounts,
 		Hub:               hub,
 		Health:            db.Ping,
+		Keys:              db,
 		Logger:            logger,
 		AllowRegistration: cfg.allowRegistration,
 		InsecureCookie:    cfg.insecureCookie,
